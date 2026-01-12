@@ -1,0 +1,4 @@
+BasedOnStyle: Google
+ColumnLimit: 0  # 这将禁用行的折叠
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true

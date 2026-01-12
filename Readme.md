@@ -2,6 +2,29 @@
 
 [基于Web与Android双端的智能笔记系统](https://github.com/NANNO35578/calcite.git)服务器
 
+后端工程结构如下：
+
+```text
+sources/
+├── CMakeLists.txt
+├── main.cc
+├── config.json
+├── controllers/
+│   ├── AuthController.cc
+│   ├── NoteController.cc
+│   └── FileController.cc
+├── models/
+│   └── User.h / Note.h（ORM生成）
+├── services/
+│   ├── AuthService.cc
+│   └── NoteService.cc
+├── utils/
+│   ├── JwtUtil.cc
+│   └── PasswordUtil.cc
+└── build/
+```
+
+
 ---
 
 # [数据库设计](./_Design_database.md)
