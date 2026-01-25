@@ -1,10 +1,9 @@
 #pragma once
 
-#include <drogon/orm/DbClient.h>
-#include <drogon/HttpResponse.h>
-#include <trantor/utils/Date.h>
+#include <drogon/orm/Mapper.h>
+#include "../models/User.h"
 #include <string>
-#include <memory>
+#include <functional>
 
 namespace calcite {
 namespace services {
@@ -26,29 +25,28 @@ struct LoginResult {
 class AuthService {
 public:
     AuthService();
-    
+
     // 用户注册
-    void registerUser(const std::string& username, 
+    void registerUser(const std::string& username,
                      const std::string& email,
                      const std::string& password,
                      std::function<void(const RegisterResult&)> callback);
-    
+
     // 用户登录
     void loginUser(const std::string& username,
                   const std::string& password,
                   std::function<void(const LoginResult&)> callback);
-    
-    // 退出登录（删除 token）
+
+    // 退出登录（JWT 模式下仅删除客户端 token）
     void logoutUser(const std::string& token,
                    std::function<void(bool, const std::string&)> callback);
-    
+
     // 验证 token 并获取用户信息
     void verifyToken(const std::string& token,
                     std::function<void(bool, int64_t, const std::string&)> callback);
 
 private:
-    drogon::orm::DbClientPtr dbClient_;
-    void saveToken(int64_t userId, const std::string& token, std::function<void()> callback);
+    drogon::orm::Mapper<drogon_model::calcite::User> userMapper_;
 };
 
 } // namespace services

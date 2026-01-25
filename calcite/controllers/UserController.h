@@ -1,7 +1,9 @@
 #pragma once
 
 #include <drogon/HttpController.h>
+#include <drogon/orm/Mapper.h>
 #include "../services/AuthService.h"
+#include "../models/User.h"
 
 using namespace drogon;
 

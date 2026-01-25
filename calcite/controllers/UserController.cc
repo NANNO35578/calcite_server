@@ -1,6 +1,5 @@
 #include "UserController.h"
 #include <drogon/drogon.h>
-#include <json/json.h>
 
 namespace calcite {
 namespace api {
@@ -24,18 +23,18 @@ void UserController::getProfile(const HttpRequestPtr& req, std::function<void(co
     if (!token.empty() && token.find("Bearer ") == 0) {
         token = token.substr(7);
     }
-    
+
     // 如果 header 中没有，尝试从 query 参数获取
     if (token.empty()) {
         token = req->getParameter("token");
     }
-    
+
     if (token.empty()) {
         auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "未提供认证token"));
         callback(resp);
         return;
     }
-    
+
     // 验证 token 并获取用户信息
     authService_.verifyToken(token, [callback, this](bool valid, int64_t userId, const std::string& username) {
         if (!valid) {
@@ -43,43 +42,38 @@ void UserController::getProfile(const HttpRequestPtr& req, std::function<void(co
             callback(resp);
             return;
         }
-        
-        // 查询用户详细信息
-        auto dbClient = drogon::app().getDbClient("default");
-        std::string sql = "SELECT id, username, email, avatar, created_at, updated_at FROM user WHERE id = ?";
-        dbClient->execSqlAsync(
-            sql,
-            [callback, this](const drogon::orm::Result& r) {
-                if (r.empty()) {
-                    auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "用户不存在"));
-                    callback(resp);
-                    return;
-                }
-                
+
+        // 使用 ORM 查询用户详细信息
+        drogon::orm::Mapper<drogon_model::calcite::User> userMapper(drogon::app().getDbClient("default"));
+        userMapper.findByPrimaryKey(
+            userId,
+            [callback, this](const drogon_model::calcite::User& user) {
                 Json::Value data;
-                data["id"] = static_cast<Json::Int64>(r[0]["id"].as<int64_t>());
-                data["username"] = r[0]["username"].as<std::string>();
-                if (!r[0]["email"].isNull()) {
-                    data["email"] = r[0]["email"].as<std::string>();
+                data["id"] = static_cast<Json::Int64>(user.getValueOfId());
+                data["username"] = user.getValueOfUsername();
+                if (user.getEmail()) {
+                    data["email"] = user.getValueOfEmail();
                 }
-                if (!r[0]["avatar"].isNull()) {
-                    data["avatar"] = r[0]["avatar"].as<std::string>();
+                if (user.getAvatar()) {
+                    data["avatar"] = user.getValueOfAvatar();
                 }
-                data["created_at"] = r[0]["created_at"].as<std::string>();
-                data["updated_at"] = r[0]["updated_at"].as<std::string>();
-                
+                if (user.getCreatedAt()) {
+                    data["created_at"] = user.getCreatedAt()->toDbStringLocal();
+                }
+                if (user.getUpdatedAt()) {
+                    data["updated_at"] = user.getUpdatedAt()->toDbStringLocal();
+                }
+
                 auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "success", data));
                 callback(resp);
             },
             [callback, this](const drogon::orm::DrogonDbException& e) {
                 auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "查询用户信息失败: " + std::string(e.base().what())));
                 callback(resp);
-            },
-            userId);
+            });
     });
 }
 
 } // namespace v1
 } // namespace api
 } // namespace calcite
-
