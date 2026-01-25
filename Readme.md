@@ -29,11 +29,49 @@ sources/
 
 # [数据库设计](./_Design_database.md)
 
-系统采用 **MySQL 8.0** 作为核心数据存储数据库，采用关系型数据模型，对用户信息、笔记内容、标签、附件以及同步记录进行统一管理。
+系统采用 **MySQL** 作为核心数据存储数据库，采用关系型数据模型，对用户信息、笔记内容、标签、附件以及同步记录进行统一管理。
 数据库设计遵循 **第三范式（3NF）**，减少数据冗余，提高数据一致性和可维护性。
 
 ---
 
 # [REST API 设计（前后端对接核心）](./_Design_REST_API.md)
 
+
+----
+
+# work path
+
+## 260125
+
+
+用户模块 API 已修改为使用 Drogon ORM 模型。主要变更如下:
+
+### AuthService.h (calcite/services/AuthService.h):
+
+使用 `drogon::orm::Mapper<drogon_model::calcite::User>` 替代 `DbClientPtr`
+移除了 `saveToken` 私有方法（JWT 模式不需要落库）
+
+### AuthService.cc (calcite/services/AuthService.cc):
+
+`registerUser`: 使用 `userMapper_.findBy()` 检查用户名/邮箱，使用 `userMapper_.insert()` 创建用户
+`loginUser`: 使用 `userMapper_.findBy()` 查询用户，移除了 user_token 插入操作
+`logoutUser`: JWT 模式下仅需客户端删除 token，服务器直接返回成功
+`verifyToken`: 直接验证 JWT，无需数据库查询
+
+### UserController.h (calcite/controllers/UserController.h):
+
+添加了 `drogon/orm/Mapper.h` 和 `models/User.h` 引用
+
+### UserController.cc (calcite/controllers/UserController.cc):
+
+使用 `userMapper.findByPrimaryKey()` 按 `userId` 查询用户详情
+使用模型类的 `getter` 方法（`getValueOfId()`, `getEmail()` 等）获取字段值
+IDE 显示的 include 错误是配置问题，不影响实际编译。
+
+
+## 260125PM
+
+- 完成笔记管理模块API.
+
+> USAGE: 在[API设计文档](./_Design_REST_API.md)中
 

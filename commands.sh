@@ -31,3 +31,15 @@ mkdir controllers services utils
 drogon_ctl create controller AuthController
 # 创建 NoteController
 drogon_ctl create controller NoteController
+
+# 创建模型类
+cd models
+drogon_ctl create model .
+
+# git add & commit
+git add .
+git commit -m "backend Note CUD APIs & Auth APIs"
+
+git add .
+git commit -m "updt docs"
+git push origin main
