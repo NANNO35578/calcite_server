@@ -87,9 +87,21 @@ void NoteFolderService::createFolder(int64_t userId,
 }
 
 void NoteFolderService::listFolders(int64_t userId,
+                                    int64_t parentId,
                                     std::function<void(bool, const std::vector<FolderDetail>&, const std::string&)> callback) {
+    // 构建查询条件：用户ID + 父文件夹ID
+    auto criteria = drogon::orm::Criteria(drogon_model::calcite::NoteFolder::Cols::_user_id, drogon::orm::CompareOperator::EQ, userId);
+
+    if (parentId > 0) {
+        // 仅获取指定父文件夹的直接子文件夹
+        criteria = criteria && drogon::orm::Criteria(drogon_model::calcite::NoteFolder::Cols::_parent_id, drogon::orm::CompareOperator::EQ, parentId);
+    } else if (parentId == 0) {
+        // parentId = 0 表示获取根级文件夹（parent_id IS NULL）
+        criteria = criteria && drogon::orm::Criteria(drogon_model::calcite::NoteFolder::Cols::_parent_id, drogon::orm::CompareOperator::IsNull);
+    }
+
     folderMapper_.findBy(
-        drogon::orm::Criteria(drogon_model::calcite::NoteFolder::Cols::_user_id, drogon::orm::CompareOperator::EQ, userId),
+        criteria,
         [this, callback](const std::vector<drogon_model::calcite::NoteFolder>& folders) {
             std::vector<FolderDetail> details;
             for (const auto& folder : folders) {

@@ -66,14 +66,17 @@ void NoteFolderController::createFolder(const HttpRequestPtr& req, std::function
 }
 
 void NoteFolderController::listFolders(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
-    verifyTokenAndGetUserId(req, [this, callback](bool valid, int64_t userId) {
+    verifyTokenAndGetUserId(req, [this, req, callback](bool valid, int64_t userId) {
         if (!valid) {
             auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "Token无效或已过期"));
             callback(resp);
             return;
         }
 
-        folderService_.listFolders(userId,
+        std::string folderIdStr = req->getParameter("folder_id");
+        int64_t parentId = folderIdStr.empty() ? 0 : std::stoll(folderIdStr);
+
+        folderService_.listFolders(userId, parentId,
             [callback, this](bool success, const std::vector<services::FolderDetail>& folders, const std::string& message) {
                 if (!success) {
                     auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, message));

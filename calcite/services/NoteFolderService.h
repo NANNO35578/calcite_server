@@ -33,8 +33,9 @@ public:
                       int64_t parentId,
                       std::function<void(const CreateFolderResult&)> callback);
 
-    // 获取文件夹列表
+    // 获取文件夹列表（仅获取指定父文件夹的直接子文件夹）
     void listFolders(int64_t userId,
+                     int64_t parentId,
                      std::function<void(bool, const std::vector<FolderDetail>&, const std::string&)> callback);
 
 private:

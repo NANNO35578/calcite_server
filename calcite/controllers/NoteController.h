@@ -2,7 +2,8 @@
 
 #include <drogon/HttpController.h>
 #include "../services/AuthService.h"
-#include "../services/NoteService.h"
+#include "../models/Note.h"
+#include "../models/NoteTag.h"
 
 using namespace drogon;
 
@@ -30,10 +31,9 @@ public:
 
 private:
     services::AuthService authService_;
-    services::NoteService noteService_;
 
     Json::Value createResponse(int code, const std::string& message, const Json::Value& data = Json::Value());
-    bool verifyTokenAndGetUserId(const HttpRequestPtr& req, std::function<void(bool, int64_t)> callback);
+    void verifyTokenAndGetUserId(const HttpRequestPtr& req, std::function<void(bool, int64_t)> callback);
 };
 
 } // namespace v1

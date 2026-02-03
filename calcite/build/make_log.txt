@@ -1,2 +1,0 @@
-[ 89%] Built target calcite
-[100%] Built target calcite_test

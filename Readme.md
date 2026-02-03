@@ -24,6 +24,13 @@ sources/
 └── build/
 ```
 
+编译命令:
+```sh
+mkdir -p calcite/build && cd calcite/build
+cmake ..
+make
+```
+
 
 ---
 
@@ -32,7 +39,7 @@ sources/
 系统采用 **MySQL** 作为核心数据存储数据库，采用关系型数据模型，对用户信息、笔记内容、标签、附件以及同步记录进行统一管理。
 数据库设计遵循 **第三范式（3NF）**，减少数据冗余，提高数据一致性和可维护性。
 
-- 以下表使用drogon生成了orm形式的模型类: `"user","note","note_folder","tag"`
+- 以下表使用drogon生成了orm形式的模型类: `"user","note","note_folder","tag","note_tag"`
 
 ---
 
