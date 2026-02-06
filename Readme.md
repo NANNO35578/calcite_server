@@ -82,5 +82,19 @@ IDE 显示的 include 错误是配置问题，不影响实际编译。
 
 - 完成笔记管理模块API.
 
-> USAGE: 在[API设计文档](./_Design_REST_API.md)中
+## 260201
+
+- 完成基本Tag&Folder API
+
+## 260203
+
+- 优化Tag&Folder API
+
+## todo: CRUD about Tag&Folder
+
+---
+
+# 请求&响应 示例
+
+> See @ [API设计文档](./docs/api.md)中
 
