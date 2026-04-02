@@ -105,6 +105,88 @@ void NoteFolderController::listFolders(const HttpRequestPtr &req, std::function<
       });
 }
 
+void NoteFolderController::updateFolder(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
+  verifyTokenAndGetUserId(req, [this, req, callback](bool valid, int64_t userId)
+      {
+        if (!valid) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "Token无效或已过期"));
+          callback(resp);
+          return;
+        }
+
+        auto json = req->getJsonObject();
+        if (!json) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "请求参数错误"));
+          callback(resp);
+          return;
+        }
+
+        int64_t folderId = json->get("folder_id", 0).asInt64();
+        if (folderId <= 0) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "文件夹ID无效"));
+          callback(resp);
+          return;
+        }
+
+        std::string name = json->get("name", "").asString();
+        int64_t parentId = json->get("parent_id", -1).asInt64();
+
+        if (name.empty() && parentId < 0) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "请至少提供 name 或 parent_id 参数"));
+          callback(resp);
+          return;
+        }
+
+        if (!name.empty()) {
+          folderService_.updateFolder(userId, folderId, name, parentId,
+              [callback, this](const services::UpdateFolderResult &result)
+              {
+                auto resp = HttpResponse::newHttpJsonResponse(createResponse(result.success ? 0 : 1, result.message));
+                callback(resp);
+              });
+        } else {
+          folderService_.updateFolder(userId, folderId, "", parentId,
+              [callback, this](const services::UpdateFolderResult &result)
+              {
+                auto resp = HttpResponse::newHttpJsonResponse(createResponse(result.success ? 0 : 1, result.message));
+                callback(resp);
+              });
+        }
+      });
+}
+
+void NoteFolderController::deleteFolder(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
+  verifyTokenAndGetUserId(req, [this, req, callback](bool valid, int64_t userId)
+      {
+        if (!valid) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "Token无效或已过期"));
+          callback(resp);
+          return;
+        }
+
+        auto json = req->getJsonObject();
+        if (!json) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "请求参数错误"));
+          callback(resp);
+          return;
+        }
+
+        int64_t folderId = json->get("folder_id", 0).asInt64();
+        if (folderId <= 0) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "文件夹ID无效"));
+          callback(resp);
+          return;
+        }
+
+        folderService_.deleteFolder(userId, folderId,
+            [callback, this](const services::DeleteFolderResult &result)
+            {
+              auto resp = HttpResponse::newHttpJsonResponse(createResponse(result.success ? 0 : 1, result.message));
+              callback(resp);
+            });
+      });
+}
+
 } // namespace v1
 } // namespace api
 } // namespace calcite

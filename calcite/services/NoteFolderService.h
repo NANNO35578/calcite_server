@@ -15,6 +15,16 @@ struct CreateFolderResult {
     int64_t folderId;
 };
 
+struct UpdateFolderResult {
+    bool success;
+    std::string message;
+};
+
+struct DeleteFolderResult {
+    bool success;
+    std::string message;
+};
+
 struct FolderDetail {
     int64_t id;
     int64_t userId;
@@ -38,9 +48,23 @@ public:
                      int64_t parentId,
                      std::function<void(bool, const std::vector<FolderDetail>&, const std::string&)> callback);
 
+    // 更新文件夹
+    void updateFolder(int64_t userId,
+                     int64_t folderId,
+                     const std::string& name,
+                     int64_t parentId,
+                     std::function<void(const UpdateFolderResult&)> callback);
+
+    // 删除文件夹
+    void deleteFolder(int64_t userId,
+                     int64_t folderId,
+                     std::function<void(const DeleteFolderResult&)> callback);
+
 private:
     drogon::orm::Mapper<drogon_model::calcite::NoteFolder> folderMapper_;
     FolderDetail folderToDetail(const drogon_model::calcite::NoteFolder& folder);
+    void getAllChildFolderIds(int64_t userId, int64_t folderId,
+                            std::function<void(const std::vector<int64_t>&)> callback);
 };
 
 } // namespace services

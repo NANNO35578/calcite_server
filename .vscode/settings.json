@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "/home/usr24/github/calcite_server/sources/test"
+    "cmake.sourceDirectory": "/home/usr24/github/calcite_server/sources/test",
+    "cmake.ignoreCMakeListsMissing": true
 }

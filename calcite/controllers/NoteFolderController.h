@@ -15,10 +15,14 @@ public:
   METHOD_LIST_BEGIN
   ADD_METHOD_TO(NoteFolderController::createFolder, "/api/folder/create", Post);
   ADD_METHOD_TO(NoteFolderController::listFolders, "/api/folder/list", Get);
+  ADD_METHOD_TO(NoteFolderController::updateFolder, "/api/folder/update", Post);
+  ADD_METHOD_TO(NoteFolderController::deleteFolder, "/api/folder/delete", Post);
   METHOD_LIST_END
 
   void createFolder(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
   void listFolders(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
+  void updateFolder(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
+  void deleteFolder(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
 
 private:
   services::AuthService authService_;

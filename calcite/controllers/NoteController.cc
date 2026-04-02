@@ -60,7 +60,8 @@ void NoteController::createNote(const HttpRequestPtr &req, std::function<void(co
         std::string summary  = json->get("summary", "").asString();
         int64_t     folderId = json->get("folder_id", 0).asInt64();
 
-        if (title.empty() || content.empty()) {
+        // if (title.empty() || content.empty()) {
+        if (title.empty()) {
           auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "标题和内容不能为空"));
           callback(resp);
           return;

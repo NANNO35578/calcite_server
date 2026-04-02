@@ -211,6 +211,150 @@ void TagController::listTags(const HttpRequestPtr &req, std::function<void(const
       });
 }
 
+void TagController::deleteTag(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
+  verifyTokenAndGetUserId(req, [this, req, callback](bool valid, int64_t userId)
+      {
+        if (!valid) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "Token无效或已过期"));
+          callback(resp);
+          return;
+        }
+
+        auto json = req->getJsonObject();
+        if (!json) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "请求参数错误"));
+          callback(resp);
+          return;
+        }
+
+        int64_t tagId = json->get("tag_id", 0).asInt64();
+        if (tagId <= 0) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "标签ID无效"));
+          callback(resp);
+          return;
+        }
+
+        auto dbClient = drogon::app().getDbClient("default");
+
+        // 验证标签存在且属于当前用户
+        drogon::orm::Mapper<drogon_model::calcite::Tag> tagMapper(dbClient);
+        tagMapper.findBy(
+            drogon::orm::Criteria(drogon_model::calcite::Tag::Cols::_id, drogon::orm::CompareOperator::EQ, tagId) &&
+                drogon::orm::Criteria(drogon_model::calcite::Tag::Cols::_user_id, drogon::orm::CompareOperator::EQ, userId),
+            [this, tagId, userId, callback, dbClient](const std::vector<drogon_model::calcite::Tag> &tags)
+            {
+              if (tags.empty()) {
+                auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "标签不存在或无权访问"));
+                callback(resp);
+                return;
+              }
+
+              // 先删除 note_tag 表中该标签的所有关联
+              drogon::orm::Mapper<drogon_model::calcite::NoteTag> noteTagMapper(dbClient);
+              noteTagMapper.deleteBy(
+                  drogon::orm::Criteria(drogon_model::calcite::NoteTag::Cols::_tag_id, drogon::orm::CompareOperator::EQ, tagId),
+                  [this, tagId, callback, dbClient](size_t count)
+                  {
+                    // 再删除标签
+                    drogon::orm::Mapper<drogon_model::calcite::Tag> tagMapper(dbClient);
+                    tagMapper.deleteByPrimaryKey(
+                        tagId,
+                        [callback, this](size_t deleteCount)
+                        {
+                          auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "删除标签成功"));
+                          callback(resp);
+                        },
+                        [callback, this](const drogon::orm::DrogonDbException &e)
+                        {
+                          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "删除标签失败: " + std::string(e.base().what())));
+                          callback(resp);
+                        });
+                  },
+                  [callback, this](const drogon::orm::DrogonDbException &e)
+                  {
+                    auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "删除标签关联失败: " + std::string(e.base().what())));
+                    callback(resp);
+                  });
+            },
+            [callback, this](const drogon::orm::DrogonDbException &e)
+            {
+              auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "验证标签失败: " + std::string(e.base().what())));
+              callback(resp);
+            });
+      });
+}
+
+void TagController::updateTag(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
+  verifyTokenAndGetUserId(req, [this, req, callback](bool valid, int64_t userId)
+      {
+        if (!valid) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "Token无效或已过期"));
+          callback(resp);
+          return;
+        }
+
+        auto json = req->getJsonObject();
+        if (!json) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "请求参数错误"));
+          callback(resp);
+          return;
+        }
+
+        int64_t tagId = json->get("tag_id", 0).asInt64();
+        std::string name = json->get("name", "").asString();
+
+        if (tagId <= 0) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "标签ID无效"));
+          callback(resp);
+          return;
+        }
+        if (name.empty()) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "标签名称不能为空"));
+          callback(resp);
+          return;
+        }
+
+        auto dbClient = drogon::app().getDbClient("default");
+
+        // 验证标签存在且属于当前用户
+        drogon::orm::Mapper<drogon_model::calcite::Tag> tagMapper(dbClient);
+        tagMapper.findBy(
+            drogon::orm::Criteria(drogon_model::calcite::Tag::Cols::_id, drogon::orm::CompareOperator::EQ, tagId) &&
+                drogon::orm::Criteria(drogon_model::calcite::Tag::Cols::_user_id, drogon::orm::CompareOperator::EQ, userId),
+            [this, tagId, userId, name, callback, dbClient](const std::vector<drogon_model::calcite::Tag> &tags)
+            {
+              if (tags.empty()) {
+                auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "标签不存在或无权访问"));
+                callback(resp);
+                return;
+              }
+
+              // 更新标签
+              drogon_model::calcite::Tag tagToUpdate = tags[0];
+              tagToUpdate.setName(name);
+
+              drogon::orm::Mapper<drogon_model::calcite::Tag> tagMapperUpdate(dbClient);
+              tagMapperUpdate.update(
+                  tagToUpdate,
+                  [callback, this](const size_t count)
+                  {
+                    auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "更新标签成功"));
+                    callback(resp);
+                  },
+                  [callback, this](const drogon::orm::DrogonDbException &e)
+                  {
+                    auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "更新标签失败: " + std::string(e.base().what())));
+                    callback(resp);
+                  });
+            },
+            [callback, this](const drogon::orm::DrogonDbException &e)
+            {
+              auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "验证标签失败: " + std::string(e.base().what())));
+              callback(resp);
+            });
+      });
+}
+
 } // namespace v1
 } // namespace api
 } // namespace calcite

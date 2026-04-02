@@ -362,8 +362,13 @@ Header: `Authorization: Bearer {token}`
 | /api/tag/create    | POST | 创建标签           |
 | /api/tag/list      | GET  | 获取标签列表         |
 | /api/tag/bind      | POST | 绑定/解除笔记标签   |
+| /api/tag/update    | POST | 更新标签           |
+| /api/tag/delete    | POST | 删除标签           |
 | /api/folder/create | POST | 创建文件夹           |
 | /api/folder/list   | GET  | 获取文件夹列表         |
+| /api/folder/update | POST | 更新文件夹           |
+| /api/folder/delete | POST | 删除文件夹           |
+
 
 **鉴权要求：** 所有接口均需通过 Token 鉴权
 
@@ -455,7 +460,63 @@ Header: `Authorization: Bearer {token}`
 
 > 注：该接口会先清除该笔记的所有标签，然后绑定新的标签。如需清除所有标签，传入 `tag_ids: []` 即可。
 
-### 3.4 创建文件夹 POST /api/folder/create
+### 3.4 更新标签 POST /api/tag/update
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求示例：**
+```json
+{
+  "tag_id": 1,
+  "name": "新标签名"
+}
+```
+
+**请求参数：**
+| 参数    | 类型   | 必填 | 说明       |
+| ------- | ------ | ------ | ---------- |
+| tag_id  | int64  | 是     | 待更新的标签ID |
+| name    | string | 是     | 新的标签名称   |
+
+**响应示例：**
+```json
+{
+  "code": 0,
+  "message": "更新标签成功",
+  "data": {}
+}
+```
+
+### 3.5 删除标签 POST /api/tag/delete
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求示例：**
+```json
+{
+  "tag_id": 1
+}
+```
+
+**请求参数：**
+| 参数    | 类型  | 必填 | 说明      |
+| ------- | ----- | ------ | --------- |
+| tag_id  | int64 | 是     | 待删除的标签ID |
+
+**响应示例：**
+```json
+{
+  "code": 0,
+  "message": "删除标签成功",
+  "data": {}
+}
+```
+
+> 注：删除标签时会同时清除该标签与所有笔记的关联关系
+
+### 3.6 创建文件夹 POST /api/folder/create
 
 **请求方式：**
 Header: `Authorization: Bearer {token}`
@@ -485,7 +546,67 @@ Header: `Authorization: Bearer {token}`
 }
 ```
 
-### 3.5 获取文件夹列表 GET /api/folder/list
+### 3.7 更新文件夹 POST /api/folder/update
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求示例：**
+```json
+{
+  "folder_id": 1,
+  "name": "新文件夹名",
+  "parent_id": 2
+}
+```
+
+**请求参数：**
+| 参数       | 类型   | 必填 | 说明                                 |
+| ---------- | ------ | ------ | ------------------------------------ |
+| folder_id  | int64  | 是     | 待更新的文件夹ID                        |
+| name       | string | 否     | 新的文件夹名称（不更新则不传或为空）       |
+| parent_id  | int64  | 否     | 新的父文件夹ID，0表示根文件夹（不更新则不传） |
+
+**响应示例：**
+```json
+{
+  "code": 0,
+  "message": "更新文件夹成功",
+  "data": {}
+}
+```
+
+> 注：更新 parent_id 时会防止循环引用（不能将文件夹设为自己或自己的子文件夹的子文件夹）
+
+### 3.8 删除文件夹 POST /api/folder/delete
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求示例：**
+```json
+{
+  "folder_id": 1
+}
+```
+
+**请求参数：**
+| 参数      | 类型  | 必填 | 说明       |
+| --------- | ----- | ------ | ---------- |
+| folder_id | int64 | 是     | 待删除的文件夹ID |
+
+**响应示例：**
+```json
+{
+  "code": 0,
+  "message": "删除文件夹成功",
+  "data": {}
+}
+```
+
+> 注：删除文件夹时会递归删除所有子文件夹，并将这些文件夹下的笔记标记为软删除（is_deleted = 1）
+
+### 3.9 获取文件夹列表 GET /api/folder/list
 
 **请求方式：**
 Header: `Authorization: Bearer {token}`
@@ -524,7 +645,7 @@ Header: `Authorization: Bearer {token}`
 
 ## 4. 文件与 OCR API
 
-| 接口                 | 方法   | 说明    |
+| 接口                | 方法   | 说明    |
 | ------------------ | ---- | ----- |
 | /api/file/upload   | POST | 上传附件  |
 | /api/file/list     | GET  | 获取附件  |
