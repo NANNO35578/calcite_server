@@ -43,3 +43,63 @@ git commit -m "backend Note CUD APIs & Auth APIs"
 git add .
 git commit -m "updt docs"
 git push origin main
+
+
+# Elastic Search
+cd ~
+wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-8.12.2-linux-x86_64.tar.gz
+tar -xzf elasticsearch-8.12.2-linux-x86_64.tar.gz
+cd elasticsearch-8.12.2
+
+vim config/elasticsearch.yml
+# network.host: 0.0.0.0
+# http.port: 9200
+# 
+# discovery.type: single-node
+# 
+# xpack.security.enabled: false
+
+# download kibana 8.12.2
+wget https://artifacts.elastic.co/downloads/kibana/kibana-8.12.2-linux-x86_64.tar.gz
+tar -zxvf kibana-8.12.2-linux-x86_64.tar.gz
+cd kibana-8.12.2
+
+# add ES Index
+curl -X PUT "localhost:9200/notes" -H 'Content-Type: application/json' -d '
+{
+  "mappings": {
+    "properties": {
+      "note_id": { "type": "long" },
+      "user_id": { "type": "long" },
+      "title": { "type": "text" },
+      "content": { "type": "text" },
+      "tags": { "type": "keyword" },
+      "created_at": { "type": "date" },
+      "updated_at": { "type": "date" }
+    }
+  }
+}
+'
+# out: {"acknowledged":true,"shards_acknowledged":true,"index":"notes"}
+
+curl -X POST "localhost:9200/notes/_doc/1" -H 'Content-Type: application/json' -d '{
+  "note_id": 1,
+  "user_id": 100,
+  "title": "第一篇笔记",
+  "content": "Kibana查看Elasticsearch数据测试",
+  "tags": ["kibana","es","教程"],
+  "created_at": "2026-04-02T22:00:00Z",
+  "updated_at": "2026-04-02T22:00:00Z"
+}'
+
+curl -X POST "localhost:9200/notes/_doc/2" -H 'Content-Type: application/json' -d '{
+  "note_id": 2,
+  "user_id": 100,
+  "title": "C++连接ES",
+  "content": "用Drogon封装EsClient",
+  "tags": ["cpp","es","drogon"],
+  "created_at": "2026-04-02T23:00:00Z",
+  "updated_at": "2026-04-02T23:00:00Z"
+}'
+# out:{"_index":"notes","_id":"1","_version":1,"result":"created","_shards":{"total":2,"successful":1,"failed":0},"_seq_no":0,"_primary_term":1}
+#     {"_index":"notes","_id":"2","_version":1,"result":"created","_shards":{"total":2,"successful":1,"failed":0},"_seq_no":1,"_primary_term":1}
