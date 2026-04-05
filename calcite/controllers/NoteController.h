@@ -2,7 +2,9 @@
 
 #include "../models/Note.h"
 #include "../models/NoteTag.h"
+#include "../models/Tag.h"
 #include "../services/AuthService.h"
+#include "../utils/EsClient.h"
 #include <drogon/HttpController.h>
 
 using namespace drogon;
@@ -31,9 +33,21 @@ public:
 
 private:
   services::AuthService authService_;
+  utils::EsClient esClient_;
 
   Json::Value createResponse(int code, const std::string &message, const Json::Value &data = Json::Value());
   void        verifyTokenAndGetUserId(const HttpRequestPtr &req, std::function<void(bool, int64_t)> callback);
+  
+  /**
+   * 获取笔记的标签列表
+   */
+  void getNoteTags(int64_t noteId, std::function<void(std::vector<std::string>)> callback);
+  
+  /**
+   * 异步索引笔记到ES
+   */
+  void indexNoteToES(int64_t noteId, int64_t userId, const drogon_model::calcite::Note& note, 
+                     const std::vector<std::string>& tags);
 };
 
 } // namespace v1

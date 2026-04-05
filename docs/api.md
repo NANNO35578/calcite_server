@@ -329,9 +329,11 @@ Header: `Authorization: Bearer {token}`
 Header: `Authorization: Bearer {token}`
 
 **请求参数：**
-| 参数    | 类型   | 必填 | 说明     |
-| ------- | ------ | ------ | -------- |
-| keyword | string | 是     | 搜索关键词 |
+| 参数    | 类型   | 必填 | 说明                    |
+| ------- | ------ | ------ | ---------------------- |
+| keyword | string | 是     | 搜索关键词              |
+| from    | int    | 否     | 分页起始位置，默认0     |
+| size    | int    | 否     | 每页数量，默认20，最大100 |
 
 **响应示例：**
 ```json
@@ -345,13 +347,69 @@ Header: `Authorization: Bearer {token}`
       "summary": "笔记摘要",
       "folder_id": 1,
       "created_at": "2025-01-01 12:00:00",
-      "updated_at": "2025-01-01 12:00:00"
+      "updated_at": "2025-01-01 12:00:00",
+      "highlight_title": "我的第一篇<mark>笔记</mark>",
+      "highlight_content": "这是一篇关于<mark>笔记</mark>的测试内容...",
+      "score": 1.25
     }
   ]
 }
 ```
 
-> 注：搜索匹配 title、content、summary 字段，响应不包含 `content` 字段
+**说明：**
+- 搜索基于 Elasticsearch 实现，支持全文检索
+- 搜索匹配字段（按权重排序）：title(3x)、tags(2x)、summary(2x)、content(1x)
+- 支持模糊匹配（fuzziness: AUTO）
+- 返回结果按相关度分数降序排列，分数相同按更新时间降序
+- `highlight_title`: 标题中的匹配高亮片段（使用 `<mark>` 标签）
+- `highlight_content`: 内容中的匹配高亮片段
+- `score`: 匹配相关度分数
+- 响应不包含完整 `content` 字段，需要详情请调用 `/api/note/detail`
+
+---
+
+## Elasticsearch 集成说明
+
+### 数据同步机制
+
+系统采用 **"先写数据库，后异步同步ES"** 的策略：
+
+| 操作   | MariaDB                     | Elasticsearch              |
+| ------ | --------------------------- | -------------------------- |
+| 创建   | 先插入记录，获取主键ID       | 异步索引文档，ID与数据库一致 |
+| 更新   | 先更新记录                   | 异步部分更新文档            |
+| 删除   | 标记 `is_deleted=1`（软删除）| 异步删除文档                |
+| 搜索   | 不参与查询                   | 执行全文检索，返回匹配ID列表 |
+
+### ES索引结构
+
+索引名称：`notes`
+
+文档字段映射：
+| 字段        | 类型       | 说明                    |
+| ----------- | ---------- | ---------------------- |
+| user_id     | long       | 用户ID，用于权限过滤     |
+| title       | text       | 标题，带keyword子字段    |
+| content     | text       | 内容                    |
+| summary     | text       | 摘要                    |
+| tags        | keyword    | 标签数组                |
+| updated_at  | date       | 更新时间                |
+
+### 搜索流程
+
+1. 客户端发起搜索请求（带关键词）
+2. 服务端在ES中执行多字段匹配查询（multi_match）
+3. 应用用户ID过滤，确保只能搜索自己的笔记
+4. 获取匹配的文档ID列表及高亮片段
+5. 根据ID列表从MariaDB批量查询完整记录
+6. 按ES返回顺序排序，合并高亮信息
+7. 返回给客户端
+
+### 容错处理
+
+- ES连接失败不影响数据库写入操作
+- ES操作失败会记录错误日志，不会阻塞主流程
+- 搜索时如果ES不可用，返回空结果
 
 ---
 
