@@ -199,8 +199,7 @@ void EsClient::search(int64_t userId,
             }
         },
         "sort": [
-            {"_score": {"order": "desc"}},
-            {"updated_at": {"order": "desc"}}
+            {"_score": {"order": "desc"}}
         ]
     })";
 
@@ -214,7 +213,8 @@ void EsClient::search(int64_t userId,
         }
 
         if (resp->getStatusCode() != 200) {
-            LOG_ERROR << "ES search failed, status=" << resp->getStatusCode();
+            LOG_ERROR << "ES search failed, status=" << resp->getStatusCode() 
+                      << ", body=" << std::string(resp->getBody());
             callback({});
             return;
         }
@@ -378,7 +378,7 @@ bool EsClient::createIndex(int timeoutMs) {
                 },
                 "updated_at": {
                     "type": "date",
-                    "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"
+                    "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis||strict_date_optional_time"
                 }
             }
         },

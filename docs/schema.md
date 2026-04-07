@@ -130,14 +130,27 @@ CREATE TABLE note_tag (
 ```sql
 CREATE TABLE file_resource (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT,
+    user_id BIGINT NOT NULL,
     note_id BIGINT,
-    file_name VARCHAR(255),
-    file_path VARCHAR(255),
-    file_type VARCHAR(50),
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(512),  -- 本地临时路径（可选）
+    file_type VARCHAR(50),   -- 文件MIME类型
+    file_size BIGINT,        -- 新增：文件大小（字节）
+    object_key VARCHAR(255) NOT NULL,  -- 新增：MinIO 唯一存储key
+    url VARCHAR(512),       -- 新增：MinIO 访问URL
+    -- 状态：processing=上传中 done=成功 failed=失败
+    status ENUM('processing', 'done', 'failed') DEFAULT 'processing',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- 外键
     FOREIGN KEY (user_id) REFERENCES user(id),
-    FOREIGN KEY (note_id) REFERENCES note(id)
+    FOREIGN KEY (note_id) REFERENCES note(id),
+    
+    -- 索引（加速查询）
+    INDEX idx_user_id (user_id),
+    INDEX idx_note_id (note_id),
+    INDEX idx_status (status)
 );
 ```
 
