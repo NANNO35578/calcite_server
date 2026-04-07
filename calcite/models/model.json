@@ -6,7 +6,8 @@
     "user": "root",
     "password": "mysql0",
     "client_encoding": "utf8mb4",
-    "tables": ["user","note","note_folder","tag","note_tag"],
+    // "tables": ["user","note","note_folder","tag","note_tag"],
+    "tables": ["file_resource"],
     "convert": {
       "enabled": false
     },

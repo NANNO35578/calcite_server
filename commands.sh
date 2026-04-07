@@ -32,6 +32,12 @@ drogon_ctl create controller AuthController
 # 创建 NoteController
 drogon_ctl create controller NoteController
 
+# 创建模型类                  #           ###########
+# 创建模型类            ############      #   #    #
+# 创建模型类            #   ###    #      #  ###   #
+# 创建模型类 ###########     #           #   #     #
+# 创建模型类             |   ###         #  ###   #
+# 创建模型类            /\___________   #    #    #
 # 创建模型类
 cd models
 drogon_ctl create model .

@@ -213,7 +213,8 @@ void FileController::uploadFile(const HttpRequestPtr &req, std::function<void(co
             [this, callback, fileRecord, fileData, contentType, &mapper](const drogon_model::calcite::FileResource& insertedFile) mutable {
                 int64_t fileId = insertedFile.getValueOfId();
                 std::string objectKey = insertedFile.getValueOfObjectKey();
-                
+                // std::cout << "After Insert " << objectKey << std::endl;
+
                 // Return immediate response with file_id
                 Json::Value data;
                 data["file_id"] = static_cast<Json::Int64>(fileId);
