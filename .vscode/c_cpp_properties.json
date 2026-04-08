@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/usr/local/include/drogon",
-                "/usr/local/include/trantor"
+                "/usr/local/include/trantor",
+                "/usr/include/jsoncpp"
             ],
             "defines": [],
             "cStandard": "c17",

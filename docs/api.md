@@ -968,14 +968,138 @@ Header: `Authorization: Bearer {token}`
 }
 ```
 
-### 4.6 OCR 图片转文本 POST /api/ocr/recognize
+### 4.6 OCR 图片转文本 API
 
-> 预留接口，待后续实现
+| 接口                 | 方法   | 说明                   |
+| -------------------- | ---- | ---------------------- |
+| /api/ocr/recognize   | POST | 上传文件进行OCR识别     |
+| /api/ocr/status      | GET  | 查询OCR处理状态         |
+
+**OCR处理流程：**
+1. 前端通过 multipart/form-data 上传图片/PDF文件
+2. 后端接收文件，创建 file_resource 记录（status = processing）
+3. 调用第三方OCR API进行文字识别
+4. 根据识别结果自动创建笔记（标题使用文件名，内容为识别的markdown文本）
+5. 异步上传原始文件到 MinIO
+6. 上传成功：更新 file_resource 的 note_id、url、status = done
+7. 上传失败：更新 status = failed
+
+**支持的文件格式：**
+- 图片：jpg, jpeg, png, bmp, webp
+- 文档：pdf
+
+#### 4.6.1 提交OCR任务 POST /api/ocr/recognize
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+Content-Type: `multipart/form-data`
+
+**请求参数：**
+| 参数   | 类型   | 必填 | 说明                      |
+| ------ | ------ | ---- | ------------------------- |
+| file   | file   | 是   | 要识别的文件（图片或PDF） |
+
+**请求示例（curl）：**
+```bash
+curl -X POST http://localhost:8080/api/ocr/recognize \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -F "file=@/path/to/document.pdf"
+```
+
+**响应示例（成功，异步处理模式）：**
+```json
+{
+  "code": 0,
+  "message": "OCR任务已提交",
+  "data": {
+    "file_id": 1001,
+    "status": "processing"
+  }
+}
+```
+
+**响应示例（不支持的文件类型）：**
+```json
+{
+  "code": 1,
+  "message": "不支持的文件类型，仅支持: JPG, PNG, BMP, WEBP, PDF"
+}
+```
 
 **说明：**
-- 上传图片文件进行 OCR 文字识别
-- 返回识别出的文本内容
-- 支持常见图片格式：jpg, png, bmp, webp
+- 接口采用异步处理模式，立即返回 file_id 和 processing 状态
+- 后台自动完成 OCR 识别、笔记创建和 MinIO 上传
+- 可通过 `/api/ocr/status` 接口轮询查询处理状态
+- 识别成功后，可通过返回的 note_id 获取创建的笔记
+
+#### 4.6.2 查询OCR状态 GET /api/ocr/status
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求参数：**
+| 参数    | 类型   | 必填 | 说明   |
+| ------- | ------ | ---- | ------ |
+| file_id | string | 是   | 文件ID |
+
+**响应示例（processing 状态）：**
+```json
+{
+  "code": 0,
+  "message": "获取OCR状态成功",
+  "data": {
+    "file_id": 1001,
+    "file_name": "document.pdf",
+    "status": "processing",
+    "file_size": 1048576,
+    "file_size_formatted": "1.00 MB",
+    "created_at": "2026-04-08 10:30:00",
+    "updated_at": "2026-04-08 10:30:00"
+  }
+}
+```
+
+**响应示例（done 状态，处理完成）：**
+```json
+{
+  "code": 0,
+  "message": "获取OCR状态成功",
+  "data": {
+    "file_id": 1001,
+    "file_name": "document.pdf",
+    "status": "done",
+    "note_id": 123,
+    "url": "http://127.0.0.1:9000/notes-files/1/2026/04/08/a1b2c3d4.pdf",
+    "file_size": 1048576,
+    "file_size_formatted": "1.00 MB",
+    "created_at": "2026-04-08 10:30:00",
+    "updated_at": "2026-04-08 10:30:15"
+  }
+}
+```
+
+**响应示例（failed 状态，处理失败）：**
+```json
+{
+  "code": 0,
+  "message": "获取OCR状态成功",
+  "data": {
+    "file_id": 1002,
+    "file_name": "corrupted.pdf",
+    "status": "failed",
+    "file_size": 0,
+    "file_size_formatted": "0.00 B",
+    "created_at": "2026-04-08 10:35:00",
+    "updated_at": "2026-04-08 10:35:05"
+  }
+}
+```
+
+**说明：**
+- 可用于轮询检查异步OCR处理的状态
+- `status` 为 `done` 时，响应中包含 `note_id`，表示笔记已成功创建
+- `status` 为 `failed` 时，表示OCR识别或后续处理失败
+- 只有文件所有者可以查询该文件的状态
 
 
 ## 5. 同步 API（双端重点）

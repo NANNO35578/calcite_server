@@ -1,1 +1,34 @@
-calcite/build/
+# ========== C++ 编译产物 ==========
+build/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.out
+*.exe
+*.dll
+*.dylib
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# ========== 日志/临时文件 ==========
+*.log
+*.tmp
+*.swp
+.DS_Store
+tree.txt
+
+# ========== IDE/工具配置 ==========
+.idea/
+.vscode/
+.claude/
+.vs/
+*.user
+*.suo
+
+# ========== 环境/本地配置 ==========
+config.local.json
+settings.local.json
+.env
