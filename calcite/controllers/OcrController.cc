@@ -10,6 +10,8 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <chrono>
+#include <cstdio>
 
 namespace calcite {
 namespace api {
@@ -82,29 +84,103 @@ std::string OcrController::formatFileSize(int64_t bytes) {
     return ss.str();
 }
 
+/**
+ * Sanitize text for database insertion
+ * - Remove null bytes
+ * - Escape control characters (except normal whitespace: \n, \r, \t)
+ * - Handle invalid UTF-8 sequences
+ */
+static std::string sanitizeText(const std::string& input) {
+    std::string output;
+    output.reserve(input.size());
+    
+    for (size_t i = 0; i < input.length(); ) {
+        unsigned char c = input[i];
+        
+        // Check for UTF-8 multi-byte sequence
+        if (c >= 0x80) {
+            // UTF-8 lead byte
+            size_t seqLen = 0;
+            if ((c & 0xE0) == 0xC0) seqLen = 2;      // 2-byte sequence
+            else if ((c & 0xF0) == 0xE0) seqLen = 3; // 3-byte sequence
+            else if ((c & 0xF8) == 0xF0) seqLen = 4; // 4-byte sequence
+            
+            if (seqLen > 0 && i + seqLen <= input.length()) {
+                // Check if following bytes are valid continuation bytes (10xxxxxx)
+                bool valid = true;
+                for (size_t j = 1; j < seqLen; j++) {
+                    if ((input[i + j] & 0xC0) != 0x80) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (valid) {
+                    // Copy valid UTF-8 sequence
+                    output.append(input, i, seqLen);
+                    i += seqLen;
+                    continue;
+                }
+            }
+            // Invalid UTF-8, skip this byte
+            i++;
+            continue;
+        }
+        
+        // Handle ASCII characters
+        if (c == '\0') {
+            // Remove null bytes
+            i++;
+        } else if (c == '\t' || c == '\n' || c == '\r') {
+            // Keep normal whitespace
+            output += c;
+            i++;
+        } else if (c < 0x20) {
+            // Escape other control characters (\x01-\x1F except \t, \n, \r)
+            char buf[7];
+            snprintf(buf, sizeof(buf), "\\x%02x", c);
+            output += buf;
+            i++;
+        } else {
+            // Normal printable ASCII
+            output += c;
+            i++;
+        }
+    }
+    
+    return output;
+}
+
 void OcrController::createNoteFromOcr(
     int64_t userId,
     const std::string& fileName,
     const std::string& markdownText,
     std::function<void(int64_t, const std::string&)> callback
 ) {
-    // Create note title from file name (without extension)
-    std::string title = fileName;
-    size_t dotPos = title.rfind('.');
-    if (dotPos != std::string::npos) {
-        title = title.substr(0, dotPos);
-    }
+    // Create note title with format: ocr_YYYYMMDD_HHMMSS
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    std::tm tm_now = *std::localtime(&time_t_now);
     
-    // Create summary from first 200 chars of content
-    std::string summary = markdownText.substr(0, std::min(size_t(200), markdownText.length()));
+    std::stringstream titleStream;
+    titleStream << "ocr_"
+                << std::setfill('0') << std::setw(4) << (tm_now.tm_year + 1900)
+                << std::setw(2) << (tm_now.tm_mon + 1)
+                << std::setw(2) << tm_now.tm_mday
+                << "_"
+                << std::setw(2) << tm_now.tm_hour
+                << std::setw(2) << tm_now.tm_min
+                << std::setw(2) << tm_now.tm_sec;
+    std::string title = titleStream.str();
+    
+    // Sanitize markdown content before inserting to database
+    std::string sanitizedContent = sanitizeText(markdownText);
     
     // Create note
     drogon_model::calcite::Note note;
     note.setUserId(userId);
     note.setTitle(title);
-    note.setContent(markdownText);
-    note.setSummary(summary);
-    note.setFolderId(0); // Default folder (uncategorized)
+    note.setContent(sanitizedContent);
+    // Note: summary is not set (left empty)
     
     drogon::orm::Mapper<drogon_model::calcite::Note> noteMapper(drogon::app().getDbClient("default"));
     noteMapper.insert(
@@ -128,7 +204,7 @@ void OcrController::updateFileResource(
     drogon::orm::Mapper<drogon_model::calcite::FileResource> mapper(drogon::app().getDbClient("default"));
     mapper.findByPrimaryKey(
         fileId,
-        [&mapper, status, noteId, url, callback](const drogon_model::calcite::FileResource& file) {
+        [mapper, status, noteId, url, callback](const drogon_model::calcite::FileResource& file) mutable {
             drogon_model::calcite::FileResource updatedFile = file;
             updatedFile.setStatus(status);
             if (noteId > 0) {
@@ -194,8 +270,7 @@ void OcrController::processOcrWorkflow(
                     
                     minioClient_.uploadFile(
                         objectKey,
-                        fileData->data(),
-                        fileData->size(),
+                        fileData,
                         contentType,
                         [this, fileId, noteId, url](const utils::UploadResult& uploadResult) {
                             if (uploadResult.success) {

@@ -59,15 +59,13 @@ public:
      * Upload file data to MinIO
      * 
      * @param objectKey The object key (path in bucket)
-     * @param data File data buffer
-     * @param dataSize Size of data in bytes
+     * @param fileData File data buffer (shared_ptr to extend lifetime for async operations)
      * @param contentType MIME type of the file
      * @param callback Callback function with UploadResult
      */
     void uploadFile(
         const std::string& objectKey,
-        const uint8_t* data,
-        size_t dataSize,
+        std::shared_ptr<std::vector<uint8_t>> fileData,
         const std::string& contentType,
         std::function<void(const UploadResult&)> callback
     );

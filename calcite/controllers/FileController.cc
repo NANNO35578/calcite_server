@@ -228,8 +228,7 @@ void FileController::uploadFile(const HttpRequestPtr &req, std::function<void(co
                 
                 minioClient_.uploadFile(
                     objectKey,
-                    fileData->data(),
-                    fileData->size(),
+                    fileData,
                     contentType,
                     [this, fileId, url, &mapper](const utils::UploadResult& result) mutable {
                         if (result.success) {

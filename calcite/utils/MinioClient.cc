@@ -193,16 +193,16 @@ std::string MinioClient::buildAuthorizationHeader(
 
 void MinioClient::uploadFile(
     const std::string& objectKey,
-    const uint8_t* data,
-    size_t dataSize,
+    std::shared_ptr<std::vector<uint8_t>> fileData,
     const std::string& contentType,
     std::function<void(const UploadResult&)> callback
 ) {
     // Run in background thread to avoid blocking
-    drogon::app().getLoop()->queueInLoop([this, objectKey, data, dataSize, contentType, callback]() {
-        std::vector<uint8_t> dataCopy(data, data + dataSize);
+    // Capture fileData shared_ptr to extend memory lifetime for async operations
+    drogon::app().getLoop()->queueInLoop([this, objectKey, fileData, contentType, callback]() {
+        std::vector<uint8_t> dataCopy(fileData->data(), fileData->data() + fileData->size());
         
-        std::thread([this, objectKey, dataCopy, dataSize, contentType, callback]() {
+        std::thread([this, objectKey, dataCopy, contentType, callback]() {
             CURL* curl = curl_easy_init();
             if (!curl) {
                 UploadResult result;
@@ -230,7 +230,7 @@ void MinioClient::uploadFile(
             curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
             curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
             curl_easy_setopt(curl, CURLOPT_POSTFIELDS, dataCopy.data());
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, dataSize);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, dataCopy.size());
             curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
