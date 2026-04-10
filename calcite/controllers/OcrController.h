@@ -10,6 +10,7 @@
 #include "../services/AuthService.h"
 #include "../services/OcrService.h"
 #include "../utils/MinioClient.h"
+#include "../utils/EsClient.h"
 #include <drogon/HttpController.h>
 
 using namespace drogon;
@@ -51,6 +52,7 @@ private:
     services::AuthService authService_;
     services::OcrService ocrService_;
     utils::MinioClient minioClient_;
+  utils::EsClient esClient_;
 
     /**
      * Create standard JSON response
@@ -106,6 +108,12 @@ private:
         const std::string& url,
         std::function<void(bool)> callback
     );
+  
+  /**
+   * 异步索引笔记到ES
+   */
+  void indexNoteToES(int64_t noteId, int64_t userId, const drogon_model::calcite::Note& note, 
+                     const std::vector<std::string>& tags);
 };
 
 } // namespace v1

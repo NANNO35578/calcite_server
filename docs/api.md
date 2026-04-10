@@ -22,26 +22,38 @@
 
 ### API 总览
 
-| 接口                | 方法 | 说明      | 附加参数 |
-| ------------------ | ---- | -------- | -------- |
-| /api/auth/register | POST | 用户注册         |         |
-| /api/auth/login    | POST | 用户登录         |         |
-| /api/auth/logout   | POST | 退出登录         |         |
-| /api/user/profile  | GET  | 获取用户信息      |         |
-|                    |      |                 |         |
-| /api/note/create   | POST | 新建笔记         |         |
-| /api/note/update   | POST | 更新笔记         |         |
-| /api/note/delete   | POST | 删除笔记         |         |
-| /api/note/list     | GET  | 获取笔记列表      | folder_id, tag_ids |
-| /api/note/detail   | GET  | 获取笔记详情      |         |
-| /api/note/search   | GET  | 全文搜索         |  keyword, from, size       |
-|                    |      |                 |         |
-| /api/tag/create    | POST | 创建标签         |         |
-| /api/tag/list      | GET  | 获取标签列表      |    note_id     |
-| /api/tag/bind      | POST | 绑定/解除笔记标签 |         |
-| /api/folder/create | POST | 创建文件夹       |         |
-| /api/folder/list   | GET  | 获取文件夹列表    |   folder_id      |
-|                    |      |                 |         |
+| 接口                | 方法 | 说明      |
+| ------------------ | ---- | -------- |
+| /api/auth/register | POST | [用户注册](#11-用户注册-post-apiauthregister)         |
+| /api/auth/login    | POST | [用户登录](#12-用户登录-post-apiauthlogin)         |
+| /api/auth/logout   | POST | [退出登录](#13-退出登录-post-apiauthlogout)         |
+| /api/user/profile  | GET  | [获取用户信息](#14-获取用户信息-get-apiuserprofile)      |
+|                    |      |                 |
+| /api/note/create   | POST | [新建笔记](#21-创建笔记-post-apinotecreate)         |
+| /api/note/update   | POST | [更新笔记](#22-更新笔记-post-apinoteupdate)         |
+| /api/note/delete   | POST | [删除笔记](#23-删除笔记-post-apinotedelete)         |
+| /api/note/list     | GET  | [获取笔记列表](#24-获取笔记列表-get-apinotelist)      |
+| /api/note/detail   | GET  | [获取笔记详情](#25-获取笔记详情-get-apinotedetail)      |
+| /api/note/search   | GET  | [全文搜索](#26-全文搜索笔记-get-apinotesearch)         |
+|                    |      |                 |
+| /api/tag/create    | POST | [创建标签](#31-创建标签-post-apitagcreate)           |
+| /api/tag/list      | GET  | [获取标签列表](#32-获取标签列表-get-apitaglist)         |
+| /api/tag/bind      | POST | [绑定/解除笔记标签](#33-绑定笔记标签-post-apitagbind)   |
+| /api/tag/update    | POST | [更新标签](#34-更新标签-post-apitagupdate)           |
+| /api/tag/delete    | POST | [删除标签](#35-删除标签-post-apitagdelete)           |
+| /api/folder/create | POST | [创建文件夹](#36-创建文件夹-post-apifoldercreate)           |
+| /api/folder/list   | GET  | [获取文件夹列表](#39-获取文件夹列表-get-apifolderlist)         |
+| /api/folder/update | POST | [更新文件夹](#37-更新文件夹-post-apifolderupdate)           |
+| /api/folder/delete | POST | [删除文件夹](#38-删除文件夹-post-apifolderdelete)           |
+|                    |      |                 |
+| /api/file/upload   | POST | [上传文件到MinIO](#41-上传文件-post-apifileupload)        |
+| /api/file/list     | GET  | [获取文件列表](#42-获取文件列表-get-apifilelist)             |
+| /api/file/delete   | POST | [删除文件(MinIO+数据库)](#43-删除文件-post-apifiledelete) |
+| /api/file/status   | GET  | [查询文件上传状态](#44-查询文件上传状态-get-apifilestatus)          |
+| /api/file/info     | GET  | [获取单个文件详情](#45-获取单个文件详情-get-apifileinfo)          |
+|                    |      |                 |
+| /api/ocr/recognize | POST | [上传文件进行OCR识别,生成新笔记](#461-提交ocr任务-post-apiocrrecognize)   |
+| /api/ocr/status    | GET  | [查询OCR处理状态](#462-查询ocr状态-get-apiocrstatus)         |
 
 ---
 

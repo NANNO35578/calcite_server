@@ -185,8 +185,12 @@ void OcrController::createNoteFromOcr(
     drogon::orm::Mapper<drogon_model::calcite::Note> noteMapper(drogon::app().getDbClient("default"));
     noteMapper.insert(
         note,
-        [callback](const drogon_model::calcite::Note& insertedNote) {
-            callback(insertedNote.getValueOfId(), "");
+        [this,callback,userId](const drogon_model::calcite::Note& insertedNote) {
+            int64_t noteId = insertedNote.getValueOfId();
+            callback(noteId, "");
+              
+            // 异步索引到ES（空标签列表，因为新笔记还没有标签）
+            indexNoteToES(noteId, userId, insertedNote, {});
         },
         [callback](const drogon::orm::DrogonDbException& e) {
             callback(0, std::string("Failed to create note: ") + e.base().what());
@@ -222,6 +226,18 @@ void OcrController::updateFileResource(
         },
         [callback](const drogon::orm::DrogonDbException&) { callback(false); }
     );
+}
+
+void OcrController::indexNoteToES(int64_t noteId, int64_t userId, const drogon_model::calcite::Note& note,
+                                   const std::vector<std::string>& tags) {
+  esClient_.indexDocument(
+    noteId,
+    userId,
+    note.getValueOfTitle(),
+    note.getValueOfContent(),
+    note.getValueOfSummary(),
+    tags
+  );
 }
 
 void OcrController::processOcrWorkflow(
