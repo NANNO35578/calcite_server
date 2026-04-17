@@ -53,6 +53,10 @@ class Note
         static const std::string _is_deleted;
         static const std::string _updated_at;
         static const std::string _created_at;
+        static const std::string _is_public;
+        static const std::string _view_count;
+        static const std::string _like_count;
+        static const std::string _collect_count;
     };
 
     static const int primaryKeyNumber;
@@ -186,8 +190,44 @@ class Note
     void setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept;
     void setCreatedAtToNull() noexcept;
 
+    /**  For column is_public  */
+    ///Get the value of the column is_public, returns the default value if the column is null
+    const int8_t &getValueOfIsPublic() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<int8_t> &getIsPublic() const noexcept;
+    ///Set the value of the column is_public
+    void setIsPublic(const int8_t &pIsPublic) noexcept;
+    void setIsPublicToNull() noexcept;
 
-    static size_t getColumnNumber() noexcept {  return 9;  }
+    /**  For column view_count  */
+    ///Get the value of the column view_count, returns the default value if the column is null
+    const int32_t &getValueOfViewCount() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<int32_t> &getViewCount() const noexcept;
+    ///Set the value of the column view_count
+    void setViewCount(const int32_t &pViewCount) noexcept;
+    void setViewCountToNull() noexcept;
+
+    /**  For column like_count  */
+    ///Get the value of the column like_count, returns the default value if the column is null
+    const int32_t &getValueOfLikeCount() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<int32_t> &getLikeCount() const noexcept;
+    ///Set the value of the column like_count
+    void setLikeCount(const int32_t &pLikeCount) noexcept;
+    void setLikeCountToNull() noexcept;
+
+    /**  For column collect_count  */
+    ///Get the value of the column collect_count, returns the default value if the column is null
+    const int32_t &getValueOfCollectCount() const noexcept;
+    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
+    const std::shared_ptr<int32_t> &getCollectCount() const noexcept;
+    ///Set the value of the column collect_count
+    void setCollectCount(const int32_t &pCollectCount) noexcept;
+    void setCollectCountToNull() noexcept;
+
+
+    static size_t getColumnNumber() noexcept {  return 13;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -218,6 +258,10 @@ class Note
     std::shared_ptr<int8_t> isDeleted_;
     std::shared_ptr<::trantor::Date> updatedAt_;
     std::shared_ptr<::trantor::Date> createdAt_;
+    std::shared_ptr<int8_t> isPublic_;
+    std::shared_ptr<int32_t> viewCount_;
+    std::shared_ptr<int32_t> likeCount_;
+    std::shared_ptr<int32_t> collectCount_;
     struct MetaData
     {
         const std::string colName_;
@@ -229,7 +273,7 @@ class Note
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[9]={ false };
+    bool dirtyFlag_[13]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -291,6 +335,30 @@ class Note
         {
             needSelection=true;
         }
+        sql += "is_public,";
+        ++parametersCount;
+        if(!dirtyFlag_[9])
+        {
+            needSelection=true;
+        }
+        sql += "view_count,";
+        ++parametersCount;
+        if(!dirtyFlag_[10])
+        {
+            needSelection=true;
+        }
+        sql += "like_count,";
+        ++parametersCount;
+        if(!dirtyFlag_[11])
+        {
+            needSelection=true;
+        }
+        sql += "collect_count,";
+        ++parametersCount;
+        if(!dirtyFlag_[12])
+        {
+            needSelection=true;
+        }
         needSelection=true;
         if(parametersCount > 0)
         {
@@ -341,6 +409,42 @@ class Note
 
         }
         if(dirtyFlag_[8])
+        {
+            sql.append("?,");
+
+        }
+        else
+        {
+            sql +="default,";
+        }
+        if(dirtyFlag_[9])
+        {
+            sql.append("?,");
+
+        }
+        else
+        {
+            sql +="default,";
+        }
+        if(dirtyFlag_[10])
+        {
+            sql.append("?,");
+
+        }
+        else
+        {
+            sql +="default,";
+        }
+        if(dirtyFlag_[11])
+        {
+            sql.append("?,");
+
+        }
+        else
+        {
+            sql +="default,";
+        }
+        if(dirtyFlag_[12])
         {
             sql.append("?,");
 

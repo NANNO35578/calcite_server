@@ -22,6 +22,10 @@ const std::string Note::Cols::_folder_id = "folder_id";
 const std::string Note::Cols::_is_deleted = "is_deleted";
 const std::string Note::Cols::_updated_at = "updated_at";
 const std::string Note::Cols::_created_at = "created_at";
+const std::string Note::Cols::_is_public = "is_public";
+const std::string Note::Cols::_view_count = "view_count";
+const std::string Note::Cols::_like_count = "like_count";
+const std::string Note::Cols::_collect_count = "collect_count";
 const std::string Note::primaryKeyName = "id";
 const bool Note::hasPrimaryKey = true;
 const std::string Note::tableName = "note";
@@ -35,7 +39,11 @@ const std::vector<typename Note::MetaData> Note::metaData_={
 {"folder_id","int64_t","bigint(20)",8,0,0,0},
 {"is_deleted","int8_t","tinyint(4)",1,0,0,0},
 {"updated_at","::trantor::Date","datetime",0,0,0,0},
-{"created_at","::trantor::Date","datetime",0,0,0,0}
+{"created_at","::trantor::Date","datetime",0,0,0,0},
+{"is_public","int8_t","tinyint(4)",1,0,0,0},
+{"view_count","int32_t","int(11)",4,0,0,0},
+{"like_count","int32_t","int(11)",4,0,0,0},
+{"collect_count","int32_t","int(11)",4,0,0,0}
 };
 const std::string &Note::getColumnName(size_t index) noexcept(false)
 {
@@ -118,11 +126,27 @@ Note::Note(const Row &r, const ssize_t indexOffset) noexcept
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
         }
+        if(!r["is_public"].isNull())
+        {
+            isPublic_=std::make_shared<int8_t>(r["is_public"].as<int8_t>());
+        }
+        if(!r["view_count"].isNull())
+        {
+            viewCount_=std::make_shared<int32_t>(r["view_count"].as<int32_t>());
+        }
+        if(!r["like_count"].isNull())
+        {
+            likeCount_=std::make_shared<int32_t>(r["like_count"].as<int32_t>());
+        }
+        if(!r["collect_count"].isNull())
+        {
+            collectCount_=std::make_shared<int32_t>(r["collect_count"].as<int32_t>());
+        }
     }
     else
     {
         size_t offset = (size_t)indexOffset;
-        if(offset + 9 > r.size())
+        if(offset + 13 > r.size())
         {
             LOG_FATAL << "Invalid SQL result for this model";
             return;
@@ -209,13 +233,33 @@ Note::Note(const Row &r, const ssize_t indexOffset) noexcept
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
         }
+        index = offset + 9;
+        if(!r[index].isNull())
+        {
+            isPublic_=std::make_shared<int8_t>(r[index].as<int8_t>());
+        }
+        index = offset + 10;
+        if(!r[index].isNull())
+        {
+            viewCount_=std::make_shared<int32_t>(r[index].as<int32_t>());
+        }
+        index = offset + 11;
+        if(!r[index].isNull())
+        {
+            likeCount_=std::make_shared<int32_t>(r[index].as<int32_t>());
+        }
+        index = offset + 12;
+        if(!r[index].isNull())
+        {
+            collectCount_=std::make_shared<int32_t>(r[index].as<int32_t>());
+        }
     }
 
 }
 
 Note::Note(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 9)
+    if(pMasqueradingVector.size() != 13)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -326,6 +370,38 @@ Note::Note(const Json::Value &pJson, const std::vector<std::string> &pMasqueradi
                 }
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
+        }
+    }
+    if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+    {
+        dirtyFlag_[9] = true;
+        if(!pJson[pMasqueradingVector[9]].isNull())
+        {
+            isPublic_=std::make_shared<int8_t>((int8_t)pJson[pMasqueradingVector[9]].asInt64());
+        }
+    }
+    if(!pMasqueradingVector[10].empty() && pJson.isMember(pMasqueradingVector[10]))
+    {
+        dirtyFlag_[10] = true;
+        if(!pJson[pMasqueradingVector[10]].isNull())
+        {
+            viewCount_=std::make_shared<int32_t>((int32_t)pJson[pMasqueradingVector[10]].asInt64());
+        }
+    }
+    if(!pMasqueradingVector[11].empty() && pJson.isMember(pMasqueradingVector[11]))
+    {
+        dirtyFlag_[11] = true;
+        if(!pJson[pMasqueradingVector[11]].isNull())
+        {
+            likeCount_=std::make_shared<int32_t>((int32_t)pJson[pMasqueradingVector[11]].asInt64());
+        }
+    }
+    if(!pMasqueradingVector[12].empty() && pJson.isMember(pMasqueradingVector[12]))
+    {
+        dirtyFlag_[12] = true;
+        if(!pJson[pMasqueradingVector[12]].isNull())
+        {
+            collectCount_=std::make_shared<int32_t>((int32_t)pJson[pMasqueradingVector[12]].asInt64());
         }
     }
 }
@@ -440,12 +516,44 @@ Note::Note(const Json::Value &pJson) noexcept(false)
             }
         }
     }
+    if(pJson.isMember("is_public"))
+    {
+        dirtyFlag_[9]=true;
+        if(!pJson["is_public"].isNull())
+        {
+            isPublic_=std::make_shared<int8_t>((int8_t)pJson["is_public"].asInt64());
+        }
+    }
+    if(pJson.isMember("view_count"))
+    {
+        dirtyFlag_[10]=true;
+        if(!pJson["view_count"].isNull())
+        {
+            viewCount_=std::make_shared<int32_t>((int32_t)pJson["view_count"].asInt64());
+        }
+    }
+    if(pJson.isMember("like_count"))
+    {
+        dirtyFlag_[11]=true;
+        if(!pJson["like_count"].isNull())
+        {
+            likeCount_=std::make_shared<int32_t>((int32_t)pJson["like_count"].asInt64());
+        }
+    }
+    if(pJson.isMember("collect_count"))
+    {
+        dirtyFlag_[12]=true;
+        if(!pJson["collect_count"].isNull())
+        {
+            collectCount_=std::make_shared<int32_t>((int32_t)pJson["collect_count"].asInt64());
+        }
+    }
 }
 
 void Note::updateByMasqueradedJson(const Json::Value &pJson,
                                             const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 9)
+    if(pMasqueradingVector.size() != 13)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -557,6 +665,38 @@ void Note::updateByMasqueradedJson(const Json::Value &pJson,
             }
         }
     }
+    if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+    {
+        dirtyFlag_[9] = true;
+        if(!pJson[pMasqueradingVector[9]].isNull())
+        {
+            isPublic_=std::make_shared<int8_t>((int8_t)pJson[pMasqueradingVector[9]].asInt64());
+        }
+    }
+    if(!pMasqueradingVector[10].empty() && pJson.isMember(pMasqueradingVector[10]))
+    {
+        dirtyFlag_[10] = true;
+        if(!pJson[pMasqueradingVector[10]].isNull())
+        {
+            viewCount_=std::make_shared<int32_t>((int32_t)pJson[pMasqueradingVector[10]].asInt64());
+        }
+    }
+    if(!pMasqueradingVector[11].empty() && pJson.isMember(pMasqueradingVector[11]))
+    {
+        dirtyFlag_[11] = true;
+        if(!pJson[pMasqueradingVector[11]].isNull())
+        {
+            likeCount_=std::make_shared<int32_t>((int32_t)pJson[pMasqueradingVector[11]].asInt64());
+        }
+    }
+    if(!pMasqueradingVector[12].empty() && pJson.isMember(pMasqueradingVector[12]))
+    {
+        dirtyFlag_[12] = true;
+        if(!pJson[pMasqueradingVector[12]].isNull())
+        {
+            collectCount_=std::make_shared<int32_t>((int32_t)pJson[pMasqueradingVector[12]].asInt64());
+        }
+    }
 }
 
 void Note::updateByJson(const Json::Value &pJson) noexcept(false)
@@ -666,6 +806,38 @@ void Note::updateByJson(const Json::Value &pJson) noexcept(false)
                 }
                 createdAt_=std::make_shared<::trantor::Date>(t*1000000+decimalNum);
             }
+        }
+    }
+    if(pJson.isMember("is_public"))
+    {
+        dirtyFlag_[9] = true;
+        if(!pJson["is_public"].isNull())
+        {
+            isPublic_=std::make_shared<int8_t>((int8_t)pJson["is_public"].asInt64());
+        }
+    }
+    if(pJson.isMember("view_count"))
+    {
+        dirtyFlag_[10] = true;
+        if(!pJson["view_count"].isNull())
+        {
+            viewCount_=std::make_shared<int32_t>((int32_t)pJson["view_count"].asInt64());
+        }
+    }
+    if(pJson.isMember("like_count"))
+    {
+        dirtyFlag_[11] = true;
+        if(!pJson["like_count"].isNull())
+        {
+            likeCount_=std::make_shared<int32_t>((int32_t)pJson["like_count"].asInt64());
+        }
+    }
+    if(pJson.isMember("collect_count"))
+    {
+        dirtyFlag_[12] = true;
+        if(!pJson["collect_count"].isNull())
+        {
+            collectCount_=std::make_shared<int32_t>((int32_t)pJson["collect_count"].asInt64());
         }
     }
 }
@@ -878,6 +1050,94 @@ void Note::setCreatedAtToNull() noexcept
     dirtyFlag_[8] = true;
 }
 
+const int8_t &Note::getValueOfIsPublic() const noexcept
+{
+    static const int8_t defaultValue = int8_t();
+    if(isPublic_)
+        return *isPublic_;
+    return defaultValue;
+}
+const std::shared_ptr<int8_t> &Note::getIsPublic() const noexcept
+{
+    return isPublic_;
+}
+void Note::setIsPublic(const int8_t &pIsPublic) noexcept
+{
+    isPublic_ = std::make_shared<int8_t>(pIsPublic);
+    dirtyFlag_[9] = true;
+}
+void Note::setIsPublicToNull() noexcept
+{
+    isPublic_.reset();
+    dirtyFlag_[9] = true;
+}
+
+const int32_t &Note::getValueOfViewCount() const noexcept
+{
+    static const int32_t defaultValue = int32_t();
+    if(viewCount_)
+        return *viewCount_;
+    return defaultValue;
+}
+const std::shared_ptr<int32_t> &Note::getViewCount() const noexcept
+{
+    return viewCount_;
+}
+void Note::setViewCount(const int32_t &pViewCount) noexcept
+{
+    viewCount_ = std::make_shared<int32_t>(pViewCount);
+    dirtyFlag_[10] = true;
+}
+void Note::setViewCountToNull() noexcept
+{
+    viewCount_.reset();
+    dirtyFlag_[10] = true;
+}
+
+const int32_t &Note::getValueOfLikeCount() const noexcept
+{
+    static const int32_t defaultValue = int32_t();
+    if(likeCount_)
+        return *likeCount_;
+    return defaultValue;
+}
+const std::shared_ptr<int32_t> &Note::getLikeCount() const noexcept
+{
+    return likeCount_;
+}
+void Note::setLikeCount(const int32_t &pLikeCount) noexcept
+{
+    likeCount_ = std::make_shared<int32_t>(pLikeCount);
+    dirtyFlag_[11] = true;
+}
+void Note::setLikeCountToNull() noexcept
+{
+    likeCount_.reset();
+    dirtyFlag_[11] = true;
+}
+
+const int32_t &Note::getValueOfCollectCount() const noexcept
+{
+    static const int32_t defaultValue = int32_t();
+    if(collectCount_)
+        return *collectCount_;
+    return defaultValue;
+}
+const std::shared_ptr<int32_t> &Note::getCollectCount() const noexcept
+{
+    return collectCount_;
+}
+void Note::setCollectCount(const int32_t &pCollectCount) noexcept
+{
+    collectCount_ = std::make_shared<int32_t>(pCollectCount);
+    dirtyFlag_[12] = true;
+}
+void Note::setCollectCountToNull() noexcept
+{
+    collectCount_.reset();
+    dirtyFlag_[12] = true;
+}
+
 void Note::updateId(const uint64_t id)
 {
     id_ = std::make_shared<int64_t>(static_cast<int64_t>(id));
@@ -893,7 +1153,11 @@ const std::vector<std::string> &Note::insertColumns() noexcept
         "folder_id",
         "is_deleted",
         "updated_at",
-        "created_at"
+        "created_at",
+        "is_public",
+        "view_count",
+        "like_count",
+        "collect_count"
     };
     return inCols;
 }
@@ -988,6 +1252,50 @@ void Note::outputArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
+    if(dirtyFlag_[9])
+    {
+        if(getIsPublic())
+        {
+            binder << getValueOfIsPublic();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[10])
+    {
+        if(getViewCount())
+        {
+            binder << getValueOfViewCount();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[11])
+    {
+        if(getLikeCount())
+        {
+            binder << getValueOfLikeCount();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[12])
+    {
+        if(getCollectCount())
+        {
+            binder << getValueOfCollectCount();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
 }
 
 const std::vector<std::string> Note::updateColumns() const
@@ -1024,6 +1332,22 @@ const std::vector<std::string> Note::updateColumns() const
     if(dirtyFlag_[8])
     {
         ret.push_back(getColumnName(8));
+    }
+    if(dirtyFlag_[9])
+    {
+        ret.push_back(getColumnName(9));
+    }
+    if(dirtyFlag_[10])
+    {
+        ret.push_back(getColumnName(10));
+    }
+    if(dirtyFlag_[11])
+    {
+        ret.push_back(getColumnName(11));
+    }
+    if(dirtyFlag_[12])
+    {
+        ret.push_back(getColumnName(12));
     }
     return ret;
 }
@@ -1118,6 +1442,50 @@ void Note::updateArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
+    if(dirtyFlag_[9])
+    {
+        if(getIsPublic())
+        {
+            binder << getValueOfIsPublic();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[10])
+    {
+        if(getViewCount())
+        {
+            binder << getValueOfViewCount();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[11])
+    {
+        if(getLikeCount())
+        {
+            binder << getValueOfLikeCount();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
+    if(dirtyFlag_[12])
+    {
+        if(getCollectCount())
+        {
+            binder << getValueOfCollectCount();
+        }
+        else
+        {
+            binder << nullptr;
+        }
+    }
 }
 Json::Value Note::toJson() const
 {
@@ -1194,6 +1562,38 @@ Json::Value Note::toJson() const
     {
         ret["created_at"]=Json::Value();
     }
+    if(getIsPublic())
+    {
+        ret["is_public"]=getValueOfIsPublic();
+    }
+    else
+    {
+        ret["is_public"]=Json::Value();
+    }
+    if(getViewCount())
+    {
+        ret["view_count"]=getValueOfViewCount();
+    }
+    else
+    {
+        ret["view_count"]=Json::Value();
+    }
+    if(getLikeCount())
+    {
+        ret["like_count"]=getValueOfLikeCount();
+    }
+    else
+    {
+        ret["like_count"]=Json::Value();
+    }
+    if(getCollectCount())
+    {
+        ret["collect_count"]=getValueOfCollectCount();
+    }
+    else
+    {
+        ret["collect_count"]=Json::Value();
+    }
     return ret;
 }
 
@@ -1206,7 +1606,7 @@ Json::Value Note::toMasqueradedJson(
     const std::vector<std::string> &pMasqueradingVector) const
 {
     Json::Value ret;
-    if(pMasqueradingVector.size() == 9)
+    if(pMasqueradingVector.size() == 13)
     {
         if(!pMasqueradingVector[0].empty())
         {
@@ -1307,6 +1707,50 @@ Json::Value Note::toMasqueradedJson(
                 ret[pMasqueradingVector[8]]=Json::Value();
             }
         }
+        if(!pMasqueradingVector[9].empty())
+        {
+            if(getIsPublic())
+            {
+                ret[pMasqueradingVector[9]]=getValueOfIsPublic();
+            }
+            else
+            {
+                ret[pMasqueradingVector[9]]=Json::Value();
+            }
+        }
+        if(!pMasqueradingVector[10].empty())
+        {
+            if(getViewCount())
+            {
+                ret[pMasqueradingVector[10]]=getValueOfViewCount();
+            }
+            else
+            {
+                ret[pMasqueradingVector[10]]=Json::Value();
+            }
+        }
+        if(!pMasqueradingVector[11].empty())
+        {
+            if(getLikeCount())
+            {
+                ret[pMasqueradingVector[11]]=getValueOfLikeCount();
+            }
+            else
+            {
+                ret[pMasqueradingVector[11]]=Json::Value();
+            }
+        }
+        if(!pMasqueradingVector[12].empty())
+        {
+            if(getCollectCount())
+            {
+                ret[pMasqueradingVector[12]]=getValueOfCollectCount();
+            }
+            else
+            {
+                ret[pMasqueradingVector[12]]=Json::Value();
+            }
+        }
         return ret;
     }
     LOG_ERROR << "Masquerade failed";
@@ -1382,6 +1826,38 @@ Json::Value Note::toMasqueradedJson(
     {
         ret["created_at"]=Json::Value();
     }
+    if(getIsPublic())
+    {
+        ret["is_public"]=getValueOfIsPublic();
+    }
+    else
+    {
+        ret["is_public"]=Json::Value();
+    }
+    if(getViewCount())
+    {
+        ret["view_count"]=getValueOfViewCount();
+    }
+    else
+    {
+        ret["view_count"]=Json::Value();
+    }
+    if(getLikeCount())
+    {
+        ret["like_count"]=getValueOfLikeCount();
+    }
+    else
+    {
+        ret["like_count"]=Json::Value();
+    }
+    if(getCollectCount())
+    {
+        ret["collect_count"]=getValueOfCollectCount();
+    }
+    else
+    {
+        ret["collect_count"]=Json::Value();
+    }
     return ret;
 }
 
@@ -1437,13 +1913,33 @@ bool Note::validateJsonForCreation(const Json::Value &pJson, std::string &err)
         if(!validJsonOfField(8, "created_at", pJson["created_at"], err, true))
             return false;
     }
+    if(pJson.isMember("is_public"))
+    {
+        if(!validJsonOfField(9, "is_public", pJson["is_public"], err, true))
+            return false;
+    }
+    if(pJson.isMember("view_count"))
+    {
+        if(!validJsonOfField(10, "view_count", pJson["view_count"], err, true))
+            return false;
+    }
+    if(pJson.isMember("like_count"))
+    {
+        if(!validJsonOfField(11, "like_count", pJson["like_count"], err, true))
+            return false;
+    }
+    if(pJson.isMember("collect_count"))
+    {
+        if(!validJsonOfField(12, "collect_count", pJson["collect_count"], err, true))
+            return false;
+    }
     return true;
 }
 bool Note::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                                               const std::vector<std::string> &pMasqueradingVector,
                                               std::string &err)
 {
-    if(pMasqueradingVector.size() != 9)
+    if(pMasqueradingVector.size() != 13)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1526,6 +2022,38 @@ bool Note::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                   return false;
           }
       }
+      if(!pMasqueradingVector[9].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[9]))
+          {
+              if(!validJsonOfField(9, pMasqueradingVector[9], pJson[pMasqueradingVector[9]], err, true))
+                  return false;
+          }
+      }
+      if(!pMasqueradingVector[10].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[10]))
+          {
+              if(!validJsonOfField(10, pMasqueradingVector[10], pJson[pMasqueradingVector[10]], err, true))
+                  return false;
+          }
+      }
+      if(!pMasqueradingVector[11].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[11]))
+          {
+              if(!validJsonOfField(11, pMasqueradingVector[11], pJson[pMasqueradingVector[11]], err, true))
+                  return false;
+          }
+      }
+      if(!pMasqueradingVector[12].empty())
+      {
+          if(pJson.isMember(pMasqueradingVector[12]))
+          {
+              if(!validJsonOfField(12, pMasqueradingVector[12], pJson[pMasqueradingVector[12]], err, true))
+                  return false;
+          }
+      }
     }
     catch(const Json::LogicError &e)
     {
@@ -1586,13 +2114,33 @@ bool Note::validateJsonForUpdate(const Json::Value &pJson, std::string &err)
         if(!validJsonOfField(8, "created_at", pJson["created_at"], err, false))
             return false;
     }
+    if(pJson.isMember("is_public"))
+    {
+        if(!validJsonOfField(9, "is_public", pJson["is_public"], err, false))
+            return false;
+    }
+    if(pJson.isMember("view_count"))
+    {
+        if(!validJsonOfField(10, "view_count", pJson["view_count"], err, false))
+            return false;
+    }
+    if(pJson.isMember("like_count"))
+    {
+        if(!validJsonOfField(11, "like_count", pJson["like_count"], err, false))
+            return false;
+    }
+    if(pJson.isMember("collect_count"))
+    {
+        if(!validJsonOfField(12, "collect_count", pJson["collect_count"], err, false))
+            return false;
+    }
     return true;
 }
 bool Note::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
                                             const std::vector<std::string> &pMasqueradingVector,
                                             std::string &err)
 {
-    if(pMasqueradingVector.size() != 9)
+    if(pMasqueradingVector.size() != 13)
     {
         err = "Bad masquerading vector";
         return false;
@@ -1646,6 +2194,26 @@ bool Note::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
       if(!pMasqueradingVector[8].empty() && pJson.isMember(pMasqueradingVector[8]))
       {
           if(!validJsonOfField(8, pMasqueradingVector[8], pJson[pMasqueradingVector[8]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[9].empty() && pJson.isMember(pMasqueradingVector[9]))
+      {
+          if(!validJsonOfField(9, pMasqueradingVector[9], pJson[pMasqueradingVector[9]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[10].empty() && pJson.isMember(pMasqueradingVector[10]))
+      {
+          if(!validJsonOfField(10, pMasqueradingVector[10], pJson[pMasqueradingVector[10]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[11].empty() && pJson.isMember(pMasqueradingVector[11]))
+      {
+          if(!validJsonOfField(11, pMasqueradingVector[11], pJson[pMasqueradingVector[11]], err, false))
+              return false;
+      }
+      if(!pMasqueradingVector[12].empty() && pJson.isMember(pMasqueradingVector[12]))
+      {
+          if(!validJsonOfField(12, pMasqueradingVector[12], pJson[pMasqueradingVector[12]], err, false))
               return false;
       }
     }
@@ -1773,6 +2341,50 @@ bool Note::validJsonOfField(size_t index,
                 return true;
             }
             if(!pJson.isString())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            break;
+        case 9:
+            if(pJson.isNull())
+            {
+                return true;
+            }
+            if(!pJson.isInt())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            break;
+        case 10:
+            if(pJson.isNull())
+            {
+                return true;
+            }
+            if(!pJson.isInt())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            break;
+        case 11:
+            if(pJson.isNull())
+            {
+                return true;
+            }
+            if(!pJson.isInt())
+            {
+                err="Type error in the "+fieldName+" field";
+                return false;
+            }
+            break;
+        case 12:
+            if(pJson.isNull())
+            {
+                return true;
+            }
+            if(!pJson.isInt())
             {
                 err="Type error in the "+fieldName+" field";
                 return false;

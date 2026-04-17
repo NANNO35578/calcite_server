@@ -180,6 +180,7 @@ void OcrController::createNoteFromOcr(
     note.setUserId(userId);
     note.setTitle(title);
     note.setContent(sanitizedContent);
+    note.setFolderId(0);// 默认放在根目录
     // Note: summary is not set (left empty)
     
     drogon::orm::Mapper<drogon_model::calcite::Note> noteMapper(drogon::app().getDbClient("default"));
@@ -189,7 +190,7 @@ void OcrController::createNoteFromOcr(
             int64_t noteId = insertedNote.getValueOfId();
             callback(noteId, "");
               
-            // 异步索引到ES（空标签列表，因为新笔记还没有标签）
+            // 异步索引到ES（空标签列表，因为新笔记还没有标签）默认不公开
             indexNoteToES(noteId, userId, insertedNote, {});
         },
         [callback](const drogon::orm::DrogonDbException& e) {

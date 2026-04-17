@@ -68,6 +68,7 @@ void NoteFolderService::createFolder(int64_t userId,
         drogon_model::calcite::NoteFolder folder;
         folder.setUserId(userId);
         folder.setName(name);
+        folder.setParentId(0);// 根文件夹 parent_id 设为 0
 
         folderMapper_.insert(
             folder,
@@ -93,13 +94,14 @@ void NoteFolderService::listFolders(int64_t userId,
     // 构建查询条件：用户ID + 父文件夹ID
     auto criteria = drogon::orm::Criteria(drogon_model::calcite::NoteFolder::Cols::_user_id, drogon::orm::CompareOperator::EQ, userId);
 
-    if (parentId > 0) {
+    if (parentId >= 0) {
         // 仅获取指定父文件夹的直接子文件夹
         criteria = criteria && drogon::orm::Criteria(drogon_model::calcite::NoteFolder::Cols::_parent_id, drogon::orm::CompareOperator::EQ, parentId);
-    } else if (parentId == 0) {
-        // parentId = 0 表示获取根级文件夹（parent_id IS NULL）
-        criteria = criteria && drogon::orm::Criteria(drogon_model::calcite::NoteFolder::Cols::_parent_id, drogon::orm::CompareOperator::IsNull);
-    }
+    } 
+    // else if (parentId == 0) {
+    //     // parentId = 0 表示获取根级文件夹（parent_id IS NULL）
+    //     criteria = criteria && drogon::orm::Criteria(drogon_model::calcite::NoteFolder::Cols::_parent_id, drogon::orm::CompareOperator::IsNull);
+    // }
 
     folderMapper_.findBy(
         criteria,

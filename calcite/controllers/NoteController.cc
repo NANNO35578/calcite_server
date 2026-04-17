@@ -117,7 +117,7 @@ void NoteController::createNote(const HttpRequestPtr &req, std::function<void(co
             {
               int64_t noteId = insertedNote.getValueOfId();
               
-              // 异步索引到ES（空标签列表，因为新笔记还没有标签）
+              // 异步索引到ES（空标签列表，因为新笔记还没有标签）默认不公开
               indexNoteToES(noteId, userId, insertedNote, {});
               
               Json::Value data;
@@ -160,12 +160,13 @@ void NoteController::updateNote(const HttpRequestPtr &req, std::function<void(co
         std::string content  = json->get("content", "").asString();
         std::string summary  = json->get("summary", "").asString();
         int64_t     folderId = json->get("folder_id", 0).asInt64();
+        bool        isPublic = json->get("is_public", false).asBool();
 
         // 检查笔记是否存在且属于当前用户
         drogon::orm::Mapper<drogon_model::calcite::Note> noteMapper(drogon::app().getDbClient("default"));
         noteMapper.findByPrimaryKey(
             noteId,
-            [this, userId, noteId, title, content, summary, folderId, callback, &noteMapper](const drogon_model::calcite::Note &note)
+            [this, userId, noteId, title, content, summary, folderId, isPublic, callback, &noteMapper](const drogon_model::calcite::Note &note)
             {
               if (note.getValueOfUserId() != userId) {
                 auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "无权访问该笔记"));
@@ -179,17 +180,19 @@ void NoteController::updateNote(const HttpRequestPtr &req, std::function<void(co
               if (!content.empty()) updatedNote.setContent(content);
               if (!summary.empty()) updatedNote.setSummary(summary);
               if (folderId >= 0) updatedNote.setFolderId(folderId);
+              if (isPublic) updatedNote.setIsPublic(isPublic);
 
               noteMapper.update(
                   updatedNote,
-                  [this, userId, noteId, title, content, summary, callback, &note](size_t count)
+                  [this, userId, noteId, title, content, summary, isPublic, callback, &note](size_t count)
                   {
                     // 异步更新ES
                     const std::string* pTitle = title.empty() ? nullptr : &title;
                     const std::string* pContent = content.empty() ? nullptr : &content;
                     const std::string* pSummary = summary.empty() ? nullptr : &summary;
+                    const bool* pIsPublic = isPublic ? &isPublic : nullptr;
                     
-                    esClient_.updateDocument(noteId, pTitle, pContent, pSummary, nullptr);
+                    esClient_.updateDocument(noteId, pTitle, pContent, pSummary, nullptr, pIsPublic);
                     
                     auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "更新笔记成功"));
                     callback(resp);
@@ -304,13 +307,14 @@ void NoteController::listNotes(const HttpRequestPtr &req, std::function<void(con
         bool        hasFolderParam = false;
 
         // 添加 folder_id 过滤
-        if (folderId > 0) {
+        if (folderId >= 0) {
           whereClause += " AND folder_id = ?";
           hasFolderParam = true;
-        } else if (folderId == 0 && !folderIdStr.empty()) {
-          // 0 表示查询未分类的笔记（folder_id IS NULL）
-          whereClause += " AND folder_id IS NULL";
-        }
+        } 
+        // else if (folderId == 0 && !folderIdStr.empty()) {
+        //   // 0 表示查询未分类的笔记（folder_id IS NULL）
+        //   whereClause += " AND folder_id IS NULL";
+        // }
 
         // 添加 tag_ids 过滤
         if (!tagIds.empty()) {
@@ -339,6 +343,7 @@ void NoteController::listNotes(const HttpRequestPtr &req, std::function<void(con
         std::string sql = "SELECT id, title, summary, folder_id, created_at, updated_at FROM note " + whereClause;
 
         // 根据是否有 folderId 参数选择调用方式
+        std::cout<<sql<<'\n';
         if (hasFolderParam) {
           dbClient->execSqlAsync(
               sql,
@@ -468,6 +473,12 @@ void NoteController::searchNotes(const HttpRequestPtr &req, std::function<void(c
           return;
         }
 
+        std::string isPublicStr = req->getParameter("is_public"); // 可选参数，有就搜索公开笔记
+        bool        isPublic    = false;
+        if (!isPublicStr.empty()) {
+          isPublic = true;
+        }
+
         // 解析分页参数
         int from = 0;
         int size = 20;
@@ -481,85 +492,30 @@ void NoteController::searchNotes(const HttpRequestPtr &req, std::function<void(c
           // 使用默认值
         }
 
-        // 使用ES进行全文搜索
-        esClient_.search(userId, keyword, 
-          [this, callback, userId, keyword](const std::vector<utils::EsSearchResult>& esResults) {
-            if (esResults.empty()) {
-              // ES返回空结果，直接返回空数组
-              Json::Value data(Json::arrayValue);
-              auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "搜索成功", data));
-              callback(resp);
-              return;
+        // 使用ES进行全文搜索，直接利用返回结果构造响应，无需二次查询数据库
+        esClient_.search(userId, isPublic, keyword, 
+          [this, callback](const std::vector<utils::EsSearchResult>& esResults) {
+            Json::Value data(Json::arrayValue);
+            for (const auto& esResult : esResults) {
+              Json::Value noteJson;
+              noteJson["id"] = static_cast<Json::Int64>(esResult.noteId);
+              noteJson["title"] = esResult.title;
+              noteJson["summary"] = esResult.summary;
+              noteJson["created_at"] = esResult.createdAt;
+              noteJson["updated_at"] = esResult.updatedAt;
+              
+              if (!esResult.highlightTitle.empty()) {
+                noteJson["highlight_title"] = esResult.highlightTitle;
+              }
+              if (!esResult.highlightContent.empty()) {
+                noteJson["highlight_content"] = esResult.highlightContent;
+              }
+              noteJson["score"] = esResult.score;
+              
+              data.append(noteJson);
             }
-
-            // 提取ID列表
-            std::vector<int64_t> noteIds;
-            std::unordered_map<int64_t, utils::EsSearchResult> esResultMap;
-            for (const auto& result : esResults) {
-              noteIds.push_back(result.noteId);
-              esResultMap[result.noteId] = result;
-            }
-
-            // 构建ID列表SQL
-            std::string idListStr;
-            for (size_t i = 0; i < noteIds.size(); ++i) {
-              if (i > 0) idListStr += ",";
-              idListStr += std::to_string(noteIds[i]);
-            }
-
-            // 从MariaDB批量查询笔记详情
-            auto dbClient = drogon::app().getDbClient("default");
-            std::string sql = 
-              "SELECT id, title, summary, folder_id, created_at, updated_at "
-              "FROM note WHERE id IN (" + idListStr + ") AND user_id = ? AND is_deleted = 0";
-
-            dbClient->execSqlAsync(
-              sql,
-              [this, callback, esResults, esResultMap](const drogon::orm::Result &result) mutable {
-                // 构建ID到笔记数据的映射（直接存储Json::Value避免Row拷贝问题）
-                std::unordered_map<int64_t, Json::Value> noteMap;
-                for (const auto &row : result) {
-                  int64_t id = row["id"].as<int64_t>();
-                  Json::Value noteJson;
-                  noteJson["id"]         = static_cast<Json::Int64>(id);
-                  noteJson["title"]      = row["title"].as<std::string>();
-                  noteJson["summary"]    = row["summary"].isNull() ? "" : row["summary"].as<std::string>();
-                  noteJson["folder_id"]  = row["folder_id"].isNull() ? 0 : static_cast<Json::Int64>(row["folder_id"].as<int64_t>());
-                  noteJson["created_at"] = row["created_at"].as<std::string>();
-                  noteJson["updated_at"] = row["updated_at"].as<std::string>();
-                  noteMap[id] = noteJson;
-                }
-
-                // 按ES返回顺序组装结果，合并高亮信息
-                Json::Value data(Json::arrayValue);
-                for (const auto& esResult : esResults) {
-                  auto it = noteMap.find(esResult.noteId);
-                  if (it != noteMap.end()) {
-                    Json::Value noteJson = it->second;
-                    
-                    // 合并高亮信息
-                    if (!esResult.highlightTitle.empty()) {
-                      noteJson["highlight_title"] = esResult.highlightTitle;
-                    }
-                    if (!esResult.highlightContent.empty()) {
-                      noteJson["highlight_content"] = esResult.highlightContent;
-                    }
-                    noteJson["score"] = esResult.score;
-                    
-                    data.append(noteJson);
-                  }
-                }
-
-                auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "搜索成功", data));
-                callback(resp);
-              },
-              [this, callback](const drogon::orm::DrogonDbException &e) {
-                LOG_ERROR << "搜索查询数据库失败: " << e.base().what();
-                auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "搜索失败: " + std::string(e.base().what())));
-                callback(resp);
-              },
-              userId
-            );
+            auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "搜索成功", data));
+            callback(resp);
           },
           from, size
         );

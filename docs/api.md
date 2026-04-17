@@ -227,7 +227,8 @@ Header: `Authorization: Bearer {token}`
   "title": "更新后的标题",
   "content": "更新后的内容",
   "summary": "更新后的摘要",
-  "folder_id": 2
+  "folder_id": 2,
+  "is_public": true
 }
 ```
 
@@ -239,6 +240,7 @@ Header: `Authorization: Bearer {token}`
 | content   | string | 否     | 更新内容                   |
 | summary   | string | 否     | 更新摘要                   |
 | folder_id | int64  | 否     | 更新文件夹ID，>=0表示更新 |
+| is_public | bool   | 否     | 更新笔记是否公开         |
 
 **响应示例：**
 ```json
@@ -341,11 +343,12 @@ Header: `Authorization: Bearer {token}`
 Header: `Authorization: Bearer {token}`
 
 **请求参数：**
-| 参数    | 类型   | 必填 | 说明                    |
-| ------- | ------ | ------ | ---------------------- |
-| keyword | string | 是     | 搜索关键词              |
-| from    | int    | 否     | 分页起始位置，默认0     |
-| size    | int    | 否     | 每页数量，默认20，最大100 |
+| 参数      | 类型   | 必填 | 说明                        |
+| -------- | ------ | ------ | ----------------------- |
+| keyword  | string | 是     | 搜索关键词               |
+| isPublic | int    | 否     | 有就搜索公开的             |
+| from     | int    | 否     | 分页起始位置，默认0         |
+| size     | int    | 否     | 每页数量，默认20，最大100   |
 
 **响应示例：**
 ```json
@@ -357,7 +360,6 @@ Header: `Authorization: Bearer {token}`
       "id": 1,
       "title": "我的第一篇笔记",
       "summary": "笔记摘要",
-      "folder_id": 1,
       "created_at": "2025-01-01 12:00:00",
       "updated_at": "2025-01-01 12:00:00",
       "highlight_title": "我的第一篇<mark>笔记</mark>",

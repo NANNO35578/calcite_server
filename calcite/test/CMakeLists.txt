@@ -3,12 +3,14 @@ project(calcite_test CXX)
 
 add_executable(${PROJECT_NAME} test_main.cc)
 
-# ##############################################################################
-# If you include the drogon source code locally in your project, use this method
-# to add drogon 
-# target_link_libraries(${PROJECT_NAME} PRIVATE drogon)
-#
-# and comment out the following lines
-target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon)
+# 链接静态库 + Drogon + 依赖
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+    calcite_lib
+    Drogon::Drogon
+    CURL::libcurl
+    OpenSSL::SSL
+    OpenSSL::Crypto
+)
 
 ParseAndAddDrogonTests(${PROJECT_NAME})

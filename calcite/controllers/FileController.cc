@@ -153,7 +153,9 @@ void FileController::uploadFile(const HttpRequestPtr &req, std::function<void(co
         if (!noteIdParam.empty()) {
             try {
                 noteId = std::stoll(noteIdParam);
+                // std::cout<<"[/file/upload] note_id: "<<noteId<<'\n';
             } catch (...) {
+                std::cout << "[/file/uploadl] Invalid note_id parameter: " << noteIdParam <<'\n';
                 // Ignore invalid note_id
             }
         }

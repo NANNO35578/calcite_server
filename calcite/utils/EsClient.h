@@ -12,7 +12,11 @@ namespace utils {
  * Elasticsearch 搜索结果结构
  */
 struct EsSearchResult {
-    int64_t noteId;              // 笔记ID
+    int64_t noteId;              // 笔记ID（来自ES文档_id）
+    std::string title;           // 原标题（从_source取）
+    std::string summary;         // 摘要（从_source取）
+    std::string createdAt;       // 创建时间
+    std::string updatedAt;       // 更新时间
     std::string highlightTitle;  // 高亮标题
     std::string highlightContent;// 高亮内容片段
     float score;                 // 匹配分数
@@ -40,13 +44,15 @@ public:
      * @param content 内容
      * @param summary 摘要
      * @param tags 标签列表
+     * @param isPublic 是否公开，默认 false
      */
     void indexDocument(int64_t noteId,
                        int64_t userId,
                        const std::string& title,
                        const std::string& content,
                        const std::string& summary,
-                       const std::vector<std::string>& tags);
+                       const std::vector<std::string>& tags,
+                       bool isPublic = false);
 
     /**
      * 异步更新文档（部分更新）
@@ -55,12 +61,14 @@ public:
      * @param content 内容（可选）
      * @param summary 摘要（可选）
      * @param tags 标签列表（可选）
+     * @param isPublic 是否公开（可选）
      */
     void updateDocument(int64_t noteId,
                         const std::string* title = nullptr,
                         const std::string* content = nullptr,
                         const std::string* summary = nullptr,
-                        const std::vector<std::string>* tags = nullptr);
+                        const std::vector<std::string>* tags = nullptr,
+                        const bool* isPublic = nullptr);
 
     /**
      * 异步删除文档
@@ -71,12 +79,14 @@ public:
     /**
      * 全文搜索（异步）
      * @param userId 用户ID（用于权限过滤）
+     * @param isPublic 是否查询自己笔记
      * @param keyword 搜索关键词
      * @param callback 回调函数，返回搜索结果列表
      * @param from 分页起始位置
      * @param size 每页大小
      */
     void search(int64_t userId,
+                bool isPublic,
                 const std::string& keyword,
                 std::function<void(const std::vector<EsSearchResult>&)> callback,
                 int from = 0,
@@ -85,6 +95,7 @@ public:
     /**
      * 同步搜索（用于简单场景）
      * @param userId 用户ID
+     * @param isPublic 是否查询自己笔记
      * @param keyword 搜索关键词
      * @param from 分页起始位置
      * @param size 每页大小
@@ -92,6 +103,7 @@ public:
      * @return 搜索结果列表
      */
     std::vector<EsSearchResult> searchSync(int64_t userId,
+                                           bool isPublic,
                                            const std::string& keyword,
                                            int from = 0,
                                            int size = 20,
@@ -120,7 +132,8 @@ private:
                                   const std::string& title,
                                   const std::string& content,
                                   const std::string& summary,
-                                  const std::vector<std::string>& tags);
+                                  const std::vector<std::string>& tags,
+                                  bool isPublic);
 
     /**
      * 解析搜索结果

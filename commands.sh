@@ -91,6 +91,24 @@ cd kibana-8.12.2
 #
 # Actully, Index在代码里创建了，这里就不需要了，直接往里面插入数据就行了
 #
+
+# afterall , 又修改了, 映射如下:
+# PUT notes
+# {
+#   "mappings": {
+#     "properties": {
+#       "title": { "type": "text", "analyzer": "ik_max_word" },
+#       "content": { "type": "text", "analyzer": "ik_max_word" },
+#       "summary": { "type": "text", "analyzer": "ik_max_word" },
+#       "tags": { "type": "keyword" },
+#       "user_id": { "type": "long" },
+#       "is_public": { "type": "boolean" },
+#       "created_at": { "type": "date" },
+#       "updated_at": { "type": "date" }
+#     }
+#   }
+# }
+
 curl -X POST "localhost:9200/notes/_doc/1" -H 'Content-Type: application/json' -d '{
   "note_id": 1,
   "user_id": 100,
@@ -114,6 +132,10 @@ curl -X POST "localhost:9200/notes/_doc/2" -H 'Content-Type: application/json' -
 #     {"_index":"notes","_id":"2","_version":1,"result":"created","_shards":{"total":2,"successful":1,"failed":0},"_seq_no":1,"_primary_term":1}
 
 # Web端可视化软件Kibana 需要安装相同版本!!!
+
+# 中文ik分词
+./elasticsearch-plugin install https://get.infini.cloud/elasticsearch/analysis-ik/8.12.2
+
 
 # ------------------------------------------------- install docker
 # 卸载旧版本（如果有）
@@ -185,7 +207,24 @@ docker run -d \
 # docker rm -f minio
 # 电脑重启用 docker start minio
 
+# 1. 用国内地址下载（速度几MB/s）
+wget https://dl.minio.org.cn/client/mc/release/linux-amd64/mc
 
+# 2. 赋权
+chmod +x mc
+
+# 3. 移到系统目录
+# sudo mv mc /usr/local/bin/
+
+# 4. 验证
+./mc --version
+
+# 配置你的服务（note是别名）
+mc alias set note http://localhost:9000 admin 12345678
+
+mc ls note
+# 设为公开只读（推荐）
+mc anonymous set download note/notes-files
 
 # ---------------------------------------------------------- PaddleOCR
 # PaddleOCR

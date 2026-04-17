@@ -42,8 +42,10 @@ std::string EsClient::buildDocumentJson(int64_t userId,
                                         const std::string& title,
                                         const std::string& content,
                                         const std::string& summary,
-                                        const std::vector<std::string>& tags) {
+                                        const std::vector<std::string>& tags,
+                                        bool isPublic) {
     std::ostringstream oss;
+    auto now = trantor::Date::now().toFormattedString(false);
     oss << "{";
     oss << "\"user_id\":" << userId << ",";
     oss << "\"title\":\"" << escapeJson(title) << "\",";
@@ -55,7 +57,9 @@ std::string EsClient::buildDocumentJson(int64_t userId,
         oss << "\"" << escapeJson(tags[i]) << "\"";
     }
     oss << "],";
-    oss << "\"updated_at\":\"" << trantor::Date::now().toFormattedString(false) << "\"";
+    oss << "\"is_public\":" << (isPublic ? "true" : "false") << ",";
+    oss << "\"created_at\":\"" << now << "\",";
+    oss << "\"updated_at\":\"" << now << "\"";
     oss << "}";
     return oss.str();
 }
@@ -65,13 +69,14 @@ void EsClient::indexDocument(int64_t noteId,
                              const std::string& title,
                              const std::string& content,
                              const std::string& summary,
-                             const std::vector<std::string>& tags) {
+                             const std::vector<std::string>& tags,
+                             bool isPublic) {
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(Put);
-    req->setPath("/" + indexName_ + "_/_doc/" + std::to_string(noteId));
+    req->setPath("/" + indexName_ + "/_doc/" + std::to_string(noteId));
     req->setContentTypeCode(CT_APPLICATION_JSON);
     
-    std::string json = buildDocumentJson(userId, title, content, summary, tags);
+    std::string json = buildDocumentJson(userId, title, content, summary, tags, isPublic);
     req->setBody(json);
 
     client_->sendRequest(req, [noteId](ReqResult result, const HttpResponsePtr& resp) {
@@ -89,10 +94,11 @@ void EsClient::updateDocument(int64_t noteId,
                               const std::string* title,
                               const std::string* content,
                               const std::string* summary,
-                              const std::vector<std::string>* tags) {
+                              const std::vector<std::string>* tags,
+                              const bool* isPublic) {
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(Post);
-    req->setPath("/" + indexName_ + "_/_update/" + std::to_string(noteId));
+    req->setPath("/" + indexName_ + "/_update/" + std::to_string(noteId));
     req->setContentTypeCode(CT_APPLICATION_JSON);
 
     std::ostringstream oss;
@@ -124,6 +130,11 @@ void EsClient::updateDocument(int64_t noteId,
         oss << "]";
         first = false;
     }
+    if (isPublic) {
+        if (!first) oss << ",";
+        oss << "\"is_public\":" << (*isPublic ? "true" : "false");
+        first = false;
+    }
     // 总是更新 updated_at
     if (!first) oss << ",";
     oss << "\"updated_at\":\"" << trantor::Date::now().toFormattedString(false) << "\"";
@@ -145,7 +156,7 @@ void EsClient::updateDocument(int64_t noteId,
 void EsClient::deleteDocument(int64_t noteId) {
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(Delete);
-    req->setPath("/" + indexName_ + "_/_doc/" + std::to_string(noteId));
+    req->setPath("/" + indexName_ + "/_doc/" + std::to_string(noteId));
 
     client_->sendRequest(req, [noteId](ReqResult result, const HttpResponsePtr& resp) {
         if (result != ReqResult::Ok) {
@@ -159,19 +170,41 @@ void EsClient::deleteDocument(int64_t noteId) {
 }
 
 void EsClient::search(int64_t userId,
+                      bool isPublic,
                       const std::string& keyword,
                       std::function<void(const std::vector<EsSearchResult>&)> callback,
                       int from,
                       int size) {
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(Post);
-    req->setPath("/" + indexName_ + "_/_search");
+    req->setPath("/" + indexName_ + "/_search");
     req->setContentTypeCode(CT_APPLICATION_JSON);
 
-    // 构建布尔查询：必须匹配关键词 + 过滤用户ID + 过滤未删除
+    // 构建过滤条件：
+    // isPublic == true 时查询所有 is_public = true 且userId!=user_id的公开笔记
+    // isPublic == false 时仅查询该 user_id 匹配的笔记
+    std::string filterJson;
+    if (isPublic == true) {
+        // 公开笔记：必须 is_public=true + 排除当前登录用户自己的笔记
+        filterJson = R"({
+            "bool": {
+                "must": [
+                    { "term": { "is_public": true } }
+                ],
+                "must_not": [
+                    { "term": { "user_id": )" + std::to_string(userId) + R"( } }
+                ]
+            }
+        })";
+    } else {
+      // 个人笔记：只匹配自己的 user_id（不限制是否公开）
+      filterJson = R"({ "term": { "user_id": )" + std::to_string(userId) + R"( } })";
+    }
+
     std::string body = R"({
         "from": )" + std::to_string(from) + R"(,
         "size": )" + std::to_string(size) + R"(,
+        "_source": ["title", "summary", "created_at", "updated_at"],  // 新增
         "query": {
             "bool": {
                 "must": [
@@ -185,7 +218,7 @@ void EsClient::search(int64_t userId,
                     }
                 ],
                 "filter": [
-                    {"term": {"user_id": )" + std::to_string(userId) + R"(}}
+)" + filterJson + R"(
                 ]
             }
         },
@@ -256,6 +289,25 @@ std::vector<EsSearchResult> EsClient::parseSearchResult(const std::string& jsonR
             result.score = static_cast<float>(hit["_score"].asDouble());
         }
 
+        // ===================== 新增：从 _source 提取字段 =====================
+        if (hit.isMember("_source")) {
+            const Json::Value& source = hit["_source"];
+            
+            if (source.isMember("title")) {
+                result.title = source["title"].asString();
+            }
+            if (source.isMember("summary")) {
+                result.summary = source["summary"].asString();
+            }
+            if (source.isMember("created_at")) {
+                result.createdAt = source["created_at"].asString();
+            }
+            if (source.isMember("updated_at")) {
+                result.updatedAt = source["updated_at"].asString();
+            }
+        }
+        // ====================================================================
+
         // 获取高亮内容
         if (hit.isMember("highlight")) {
             const Json::Value& highlight = hit["highlight"];
@@ -287,6 +339,7 @@ std::vector<EsSearchResult> EsClient::parseSearchResult(const std::string& jsonR
 }
 
 std::vector<EsSearchResult> EsClient::searchSync(int64_t userId,
+                                                  bool isPublic,
                                                   const std::string& keyword,
                                                   int from,
                                                   int size,
@@ -294,7 +347,7 @@ std::vector<EsSearchResult> EsClient::searchSync(int64_t userId,
     std::promise<std::vector<EsSearchResult>> promise;
     auto future = promise.get_future();
 
-    search(userId, keyword, [&promise](const std::vector<EsSearchResult>& results) {
+    search(userId, isPublic, keyword, [&promise](const std::vector<EsSearchResult>& results) {
         promise.set_value(results);
     }, from, size);
 
@@ -357,29 +410,33 @@ bool EsClient::createIndex(int timeoutMs) {
     std::string mapping = R"({
         "mappings": {
             "properties": {
-                "user_id": {"type": "long"},
                 "title": {
-                    "type": "text",
-                    "analyzer": "standard",
-                    "fields": {
-                        "keyword": {"type": "keyword", "ignore_above": 256}
-                    }
-                },
-                "content": {
-                    "type": "text",
-                    "analyzer": "standard"
-                },
-                "summary": {
-                    "type": "text",
-                    "analyzer": "standard"
-                },
-                "tags": {
-                    "type": "keyword"
-                },
-                "updated_at": {
-                    "type": "date",
-                    "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis||strict_date_optional_time"
-                }
+                "type": "text",
+                "analyzer": "ik_max_word"
+              },
+              "content": {
+                "type": "text",
+                "analyzer": "ik_max_word"
+              },
+              "summary": {
+                "type": "text",
+                "analyzer": "ik_max_word"
+              },
+              "tags": {
+                "type": "keyword"
+              },
+              "user_id": {
+                "type": "long"
+              },
+              "is_public": {
+                "type": "boolean"
+              },
+              "created_at": {
+                "type": "date"
+              },
+              "updated_at": {
+                "type": "date"
+              }
             }
         },
         "settings": {
