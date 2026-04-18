@@ -1,0 +1,28 @@
+{
+  "id": "9a60c9d6-327b-4e21-a777-a260c7854c4f",
+  "object": "chat.completion",
+  "created": 1776531114,
+  "model": "deepseek-chat",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Windows, MSYS2, MinGW, 编译工具, 环境配置"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 2720,
+    "completion_tokens": 16,
+    "total_tokens": 2736,
+    "prompt_tokens_details": {
+      "cached_tokens": 2688
+    },
+    "prompt_cache_hit_tokens": 2688,
+    "prompt_cache_miss_tokens": 32
+  },
+  "system_fingerprint": "fp_eaab8d114b_prod0820_fp8_kvcache_new_kvcache_20260410"
+}

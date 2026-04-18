@@ -538,9 +538,8 @@ void NoteController::generateNoteTagsByAi(const HttpRequestPtr &req, std::functi
           return;
         }
 
-        std::cout<<"crash Here?"<<'\n';
-        dsService_.recommendTags(content, [this, noteId, callback, dbClient](const calcite::services::TagRecommendationResult &result) {
-        std::cout<<"crash Not Here."<<'\n';
+        kimiService_.recommendTags(content, [this, noteId, callback, dbClient](const calcite::services::TagRecommendationResult &result) {
+        // dsService_.recommendTags(content, [this, noteId, callback, dbClient](const calcite::services::TagRecommendationResult &result) {
           if (!result.success) {
             auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "AI标签生成失败: " + result.errorMessage));
             callback(resp);
@@ -557,7 +556,6 @@ void NoteController::generateNoteTagsByAi(const HttpRequestPtr &req, std::functi
           tagMapper.findBy(
             drogon::orm::Criteria(drogon_model::calcite::Tag::Cols::_name, drogon::orm::CompareOperator::In, result.tags),
             [this, noteId, callback, dbClient, result](const std::vector<drogon_model::calcite::Tag> &tags) {
-              std::cout<<"crash Not Here. tags size: "<<tags.size()<<'\n';
               std::vector<int64_t> tagIds;
               std::vector<std::string> tagNames;
               for (const auto &tag : tags) {
@@ -573,44 +571,56 @@ void NoteController::generateNoteTagsByAi(const HttpRequestPtr &req, std::functi
 
               drogon::orm::Mapper<drogon_model::calcite::NoteTag> noteTagMapper(dbClient);
               noteTagMapper.deleteBy(
-                drogon::orm::Criteria(drogon_model::calcite::NoteTag::Cols::_note_id, noteId),
-                [this, noteId, callback, dbClient, tagIds, tagNames](size_t) {
-                  std::function<void(size_t)> doInsert = [&](size_t index) {
-                    if (index >= tagIds.size()) {
-                      esClient_.updateDocument(noteId, nullptr, nullptr, nullptr, tagNames, nullptr);
-                      Json::Value data(Json::arrayValue);
-                      for (const auto &name : tagNames) {
-                        Json::Value obj;
-                        obj["name"] = name;
-                        data.append(obj);
-                      }
-                      auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "AI标签生成并保存成功", data));
+                  drogon::orm::Criteria(drogon_model::calcite::NoteTag::Cols::_note_id, noteId),
+                  // 删除旧关联成功后，走这里批量插入新关联
+                  [this, noteId, callback, dbClient, tagIds, tagNames](size_t) {
+                    // ======================
+                    // 批量插入 NoteTag（原生 SQL，最稳）
+                    // ======================
+                    if (tagIds.empty()) {
+                      esClient_.updateDocument(noteId, nullptr, nullptr, nullptr, {}, nullptr);
+                      auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "AI标签生成为空", Json::arrayValue));
                       callback(resp);
                       return;
                     }
-                    drogon_model::calcite::NoteTag nt;
-                    nt.setNoteId(noteId);
-                    nt.setTagId(tagIds[index]);
-                    drogon::orm::Mapper<drogon_model::calcite::NoteTag> insertMapper(dbClient);
-                    insertMapper.insert(
-                      nt,
-                      [doInsert, index](const drogon_model::calcite::NoteTag &) {
-                        doInsert(index + 1);
-                      },
-                      [this, callback](const drogon::orm::DrogonDbException &e) {
-                        LOG_ERROR << "NoteTag insert failed: " << e.base().what();
-                        auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "保存标签关联失败: " + std::string(e.base().what())));
-                        callback(resp);
-                      }
+
+                    // 组装完整 SQL
+                    std::string sql = R"(INSERT INTO note_tag (note_id, tag_id) VALUES)";
+                    for(auto tid:tagIds){
+                      sql+="("+std::to_string(noteId)+","+std::to_string(tid)+"),";
+                    }
+                    sql.pop_back(); // 去掉最后一个逗号
+
+                    // 执行 SQL
+                    dbClient->execSqlAsync(
+                        sql,
+                        [this, noteId, callback, tagNames](const drogon::orm::Result &res) {
+                          // 全部插入成功！
+                          esClient_.updateDocument(noteId, nullptr, nullptr, nullptr, tagNames, nullptr);
+
+                          Json::Value data;
+                          for (auto &name : tagNames) {
+                            Json::Value obj;
+                            obj["name"] = name;
+                            data.append(obj);
+                          }
+
+                          auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "AI标签生成并保存成功", data));
+                          callback(resp);
+                        },
+                        [this, callback](const drogon::orm::DrogonDbException &e)
+                        {
+                          LOG_ERROR << "批量插入标签失败: " << e.base().what();
+                          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "保存标签失败: " + std::string(e.base().what())));
+                          callback(resp);
+                        }
                     );
-                  };
-                  doInsert(0);
-                },
-                [this, callback](const drogon::orm::DrogonDbException &e) {
-                  auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "清除旧标签关联失败: " + std::string(e.base().what())));
-                  callback(resp);
-                }
-              );
+                  },
+                  [this, callback](const drogon::orm::DrogonDbException &e)
+                  {
+                    auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "清除旧标签关联失败: " + std::string(e.base().what())));
+                    callback(resp);
+                  });
             },
             [this, callback](const drogon::orm::DrogonDbException &e) {
               auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "查询标签失败: " + std::string(e.base().what())));

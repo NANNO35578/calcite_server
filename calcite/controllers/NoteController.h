@@ -5,6 +5,7 @@
 #include "../models/Tag.h"
 #include "../services/AuthService.h"
 #include "../services/DsService.h"
+#include "../services/KimiService.h"
 #include "../utils/EsClient.h"
 #include <drogon/HttpController.h>
 
@@ -38,7 +39,8 @@ public:
 
 private:
   services::AuthService authService_;
-  services::DsService   dsService_;
+  // services::DsService   dsService_;
+  services::KimiService   kimiService_;
   utils::EsClient       esClient_;
 
   Json::Value createResponse(int code, const std::string &message, const Json::Value &data = Json::Value());
