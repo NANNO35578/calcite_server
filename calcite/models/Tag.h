@@ -45,7 +45,6 @@ class Tag
     struct Cols
     {
         static const std::string _id;
-        static const std::string _user_id;
         static const std::string _name;
         static const std::string _created_at;
     };
@@ -107,14 +106,6 @@ class Tag
     ///Set the value of the column id
     void setId(const int64_t &pId) noexcept;
 
-    /**  For column user_id  */
-    ///Get the value of the column user_id, returns the default value if the column is null
-    const int64_t &getValueOfUserId() const noexcept;
-    ///Return a shared_ptr object pointing to the column const value, or an empty shared_ptr object if the column is null
-    const std::shared_ptr<int64_t> &getUserId() const noexcept;
-    ///Set the value of the column user_id
-    void setUserId(const int64_t &pUserId) noexcept;
-
     /**  For column name  */
     ///Get the value of the column name, returns the default value if the column is null
     const std::string &getValueOfName() const noexcept;
@@ -123,7 +114,6 @@ class Tag
     ///Set the value of the column name
     void setName(const std::string &pName) noexcept;
     void setName(std::string &&pName) noexcept;
-    void setNameToNull() noexcept;
 
     /**  For column created_at  */
     ///Get the value of the column created_at, returns the default value if the column is null
@@ -135,7 +125,7 @@ class Tag
     void setCreatedAtToNull() noexcept;
 
 
-    static size_t getColumnNumber() noexcept {  return 4;  }
+    static size_t getColumnNumber() noexcept {  return 3;  }
     static const std::string &getColumnName(size_t index) noexcept(false);
 
     Json::Value toJson() const;
@@ -158,7 +148,6 @@ class Tag
     ///For mysql or sqlite3
     void updateId(const uint64_t id);
     std::shared_ptr<int64_t> id_;
-    std::shared_ptr<int64_t> userId_;
     std::shared_ptr<std::string> name_;
     std::shared_ptr<::trantor::Date> createdAt_;
     struct MetaData
@@ -172,7 +161,7 @@ class Tag
         const bool notNull_;
     };
     static const std::vector<MetaData> metaData_;
-    bool dirtyFlag_[4]={ false };
+    bool dirtyFlag_[3]={ false };
   public:
     static const std::string &sqlForFindingByPrimaryKey()
     {
@@ -194,17 +183,12 @@ class Tag
             ++parametersCount;
         if(dirtyFlag_[1])
         {
-            sql += "user_id,";
-            ++parametersCount;
-        }
-        if(dirtyFlag_[2])
-        {
             sql += "name,";
             ++parametersCount;
         }
         sql += "created_at,";
         ++parametersCount;
-        if(!dirtyFlag_[3])
+        if(!dirtyFlag_[2])
         {
             needSelection=true;
         }
@@ -224,11 +208,6 @@ class Tag
 
         }
         if(dirtyFlag_[2])
-        {
-            sql.append("?,");
-
-        }
-        if(dirtyFlag_[3])
         {
             sql.append("?,");
 

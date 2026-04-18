@@ -49,9 +49,9 @@ public:
     void indexDocument(int64_t noteId,
                        int64_t userId,
                        const std::string& title,
-                       const std::string& content,
-                       const std::string& summary,
-                       const std::vector<std::string>& tags,
+                       const std::string* content=nullptr,
+                       const std::string* summary=nullptr,
+                       const std::vector<std::string>& tags=std::vector<std::string>(),
                        bool isPublic = false);
 
     /**
@@ -67,7 +67,7 @@ public:
                         const std::string* title = nullptr,
                         const std::string* content = nullptr,
                         const std::string* summary = nullptr,
-                        const std::vector<std::string>* tags = nullptr,
+                        const std::vector<std::string>& tags = std::vector<std::string>(),
                         const bool* isPublic = nullptr);
 
     /**
@@ -129,9 +129,9 @@ private:
      * 构建文档JSON
      */
     std::string buildDocumentJson(int64_t userId,
-                                  const std::string& title,
-                                  const std::string& content,
-                                  const std::string& summary,
+                                  const std::string* title,
+                                  const std::string* content,
+                                  const std::string* summary,
                                   const std::vector<std::string>& tags,
                                   bool isPublic);
 
@@ -143,7 +143,7 @@ private:
     /**
      * 转义JSON字符串
      */
-    std::string escapeJson(const std::string& str);
+    std::string escapeJson(const std::string* str);
 };
 
 } // namespace utils

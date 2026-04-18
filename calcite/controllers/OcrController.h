@@ -111,6 +111,8 @@ private:
   
   /**
    * 异步索引笔记到ES
+   * tag可能存在
+   * TODO 预留后续接入大模型生成TAG 再做修改
    */
   void indexNoteToES(int64_t noteId, int64_t userId, const drogon_model::calcite::Note& note, 
                      const std::vector<std::string>& tags);

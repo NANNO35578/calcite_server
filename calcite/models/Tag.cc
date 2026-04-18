@@ -14,7 +14,6 @@ using namespace drogon::orm;
 using namespace drogon_model::calcite;
 
 const std::string Tag::Cols::_id = "id";
-const std::string Tag::Cols::_user_id = "user_id";
 const std::string Tag::Cols::_name = "name";
 const std::string Tag::Cols::_created_at = "created_at";
 const std::string Tag::primaryKeyName = "id";
@@ -23,8 +22,7 @@ const std::string Tag::tableName = "tag";
 
 const std::vector<typename Tag::MetaData> Tag::metaData_={
 {"id","int64_t","bigint(20)",8,1,1,1},
-{"user_id","int64_t","bigint(20)",8,0,0,1},
-{"name","std::string","varchar(50)",50,0,0,0},
+{"name","std::string","varchar(50)",50,0,0,1},
 {"created_at","::trantor::Date","datetime",0,0,0,0}
 };
 const std::string &Tag::getColumnName(size_t index) noexcept(false)
@@ -39,10 +37,6 @@ Tag::Tag(const Row &r, const ssize_t indexOffset) noexcept
         if(!r["id"].isNull())
         {
             id_=std::make_shared<int64_t>(r["id"].as<int64_t>());
-        }
-        if(!r["user_id"].isNull())
-        {
-            userId_=std::make_shared<int64_t>(r["user_id"].as<int64_t>());
         }
         if(!r["name"].isNull())
         {
@@ -74,7 +68,7 @@ Tag::Tag(const Row &r, const ssize_t indexOffset) noexcept
     else
     {
         size_t offset = (size_t)indexOffset;
-        if(offset + 4 > r.size())
+        if(offset + 3 > r.size())
         {
             LOG_FATAL << "Invalid SQL result for this model";
             return;
@@ -88,14 +82,9 @@ Tag::Tag(const Row &r, const ssize_t indexOffset) noexcept
         index = offset + 1;
         if(!r[index].isNull())
         {
-            userId_=std::make_shared<int64_t>(r[index].as<int64_t>());
-        }
-        index = offset + 2;
-        if(!r[index].isNull())
-        {
             name_=std::make_shared<std::string>(r[index].as<std::string>());
         }
-        index = offset + 3;
+        index = offset + 2;
         if(!r[index].isNull())
         {
             auto timeStr = r[index].as<std::string>();
@@ -124,7 +113,7 @@ Tag::Tag(const Row &r, const ssize_t indexOffset) noexcept
 
 Tag::Tag(const Json::Value &pJson, const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 4)
+    if(pMasqueradingVector.size() != 3)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -142,7 +131,7 @@ Tag::Tag(const Json::Value &pJson, const std::vector<std::string> &pMasquerading
         dirtyFlag_[1] = true;
         if(!pJson[pMasqueradingVector[1]].isNull())
         {
-            userId_=std::make_shared<int64_t>((int64_t)pJson[pMasqueradingVector[1]].asInt64());
+            name_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
         }
     }
     if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
@@ -150,15 +139,7 @@ Tag::Tag(const Json::Value &pJson, const std::vector<std::string> &pMasquerading
         dirtyFlag_[2] = true;
         if(!pJson[pMasqueradingVector[2]].isNull())
         {
-            name_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
-        }
-    }
-    if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
-    {
-        dirtyFlag_[3] = true;
-        if(!pJson[pMasqueradingVector[3]].isNull())
-        {
-            auto timeStr = pJson[pMasqueradingVector[3]].asString();
+            auto timeStr = pJson[pMasqueradingVector[2]].asString();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
             auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
@@ -191,17 +172,9 @@ Tag::Tag(const Json::Value &pJson) noexcept(false)
             id_=std::make_shared<int64_t>((int64_t)pJson["id"].asInt64());
         }
     }
-    if(pJson.isMember("user_id"))
-    {
-        dirtyFlag_[1]=true;
-        if(!pJson["user_id"].isNull())
-        {
-            userId_=std::make_shared<int64_t>((int64_t)pJson["user_id"].asInt64());
-        }
-    }
     if(pJson.isMember("name"))
     {
-        dirtyFlag_[2]=true;
+        dirtyFlag_[1]=true;
         if(!pJson["name"].isNull())
         {
             name_=std::make_shared<std::string>(pJson["name"].asString());
@@ -209,7 +182,7 @@ Tag::Tag(const Json::Value &pJson) noexcept(false)
     }
     if(pJson.isMember("created_at"))
     {
-        dirtyFlag_[3]=true;
+        dirtyFlag_[2]=true;
         if(!pJson["created_at"].isNull())
         {
             auto timeStr = pJson["created_at"].asString();
@@ -238,7 +211,7 @@ Tag::Tag(const Json::Value &pJson) noexcept(false)
 void Tag::updateByMasqueradedJson(const Json::Value &pJson,
                                             const std::vector<std::string> &pMasqueradingVector) noexcept(false)
 {
-    if(pMasqueradingVector.size() != 4)
+    if(pMasqueradingVector.size() != 3)
     {
         LOG_ERROR << "Bad masquerading vector";
         return;
@@ -255,7 +228,7 @@ void Tag::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[1] = true;
         if(!pJson[pMasqueradingVector[1]].isNull())
         {
-            userId_=std::make_shared<int64_t>((int64_t)pJson[pMasqueradingVector[1]].asInt64());
+            name_=std::make_shared<std::string>(pJson[pMasqueradingVector[1]].asString());
         }
     }
     if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
@@ -263,15 +236,7 @@ void Tag::updateByMasqueradedJson(const Json::Value &pJson,
         dirtyFlag_[2] = true;
         if(!pJson[pMasqueradingVector[2]].isNull())
         {
-            name_=std::make_shared<std::string>(pJson[pMasqueradingVector[2]].asString());
-        }
-    }
-    if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
-    {
-        dirtyFlag_[3] = true;
-        if(!pJson[pMasqueradingVector[3]].isNull())
-        {
-            auto timeStr = pJson[pMasqueradingVector[3]].asString();
+            auto timeStr = pJson[pMasqueradingVector[2]].asString();
             struct tm stm;
             memset(&stm,0,sizeof(stm));
             auto p = strptime(timeStr.c_str(),"%Y-%m-%d %H:%M:%S",&stm);
@@ -303,17 +268,9 @@ void Tag::updateByJson(const Json::Value &pJson) noexcept(false)
             id_=std::make_shared<int64_t>((int64_t)pJson["id"].asInt64());
         }
     }
-    if(pJson.isMember("user_id"))
-    {
-        dirtyFlag_[1] = true;
-        if(!pJson["user_id"].isNull())
-        {
-            userId_=std::make_shared<int64_t>((int64_t)pJson["user_id"].asInt64());
-        }
-    }
     if(pJson.isMember("name"))
     {
-        dirtyFlag_[2] = true;
+        dirtyFlag_[1] = true;
         if(!pJson["name"].isNull())
         {
             name_=std::make_shared<std::string>(pJson["name"].asString());
@@ -321,7 +278,7 @@ void Tag::updateByJson(const Json::Value &pJson) noexcept(false)
     }
     if(pJson.isMember("created_at"))
     {
-        dirtyFlag_[3] = true;
+        dirtyFlag_[2] = true;
         if(!pJson["created_at"].isNull())
         {
             auto timeStr = pJson["created_at"].asString();
@@ -369,23 +326,6 @@ const typename Tag::PrimaryKeyType & Tag::getPrimaryKey() const
     return *id_;
 }
 
-const int64_t &Tag::getValueOfUserId() const noexcept
-{
-    static const int64_t defaultValue = int64_t();
-    if(userId_)
-        return *userId_;
-    return defaultValue;
-}
-const std::shared_ptr<int64_t> &Tag::getUserId() const noexcept
-{
-    return userId_;
-}
-void Tag::setUserId(const int64_t &pUserId) noexcept
-{
-    userId_ = std::make_shared<int64_t>(pUserId);
-    dirtyFlag_[1] = true;
-}
-
 const std::string &Tag::getValueOfName() const noexcept
 {
     static const std::string defaultValue = std::string();
@@ -400,17 +340,12 @@ const std::shared_ptr<std::string> &Tag::getName() const noexcept
 void Tag::setName(const std::string &pName) noexcept
 {
     name_ = std::make_shared<std::string>(pName);
-    dirtyFlag_[2] = true;
+    dirtyFlag_[1] = true;
 }
 void Tag::setName(std::string &&pName) noexcept
 {
     name_ = std::make_shared<std::string>(std::move(pName));
-    dirtyFlag_[2] = true;
-}
-void Tag::setNameToNull() noexcept
-{
-    name_.reset();
-    dirtyFlag_[2] = true;
+    dirtyFlag_[1] = true;
 }
 
 const ::trantor::Date &Tag::getValueOfCreatedAt() const noexcept
@@ -427,12 +362,12 @@ const std::shared_ptr<::trantor::Date> &Tag::getCreatedAt() const noexcept
 void Tag::setCreatedAt(const ::trantor::Date &pCreatedAt) noexcept
 {
     createdAt_ = std::make_shared<::trantor::Date>(pCreatedAt);
-    dirtyFlag_[3] = true;
+    dirtyFlag_[2] = true;
 }
 void Tag::setCreatedAtToNull() noexcept
 {
     createdAt_.reset();
-    dirtyFlag_[3] = true;
+    dirtyFlag_[2] = true;
 }
 
 void Tag::updateId(const uint64_t id)
@@ -443,7 +378,6 @@ void Tag::updateId(const uint64_t id)
 const std::vector<std::string> &Tag::insertColumns() noexcept
 {
     static const std::vector<std::string> inCols={
-        "user_id",
         "name",
         "created_at"
     };
@@ -454,17 +388,6 @@ void Tag::outputArgs(drogon::orm::internal::SqlBinder &binder) const
 {
     if(dirtyFlag_[1])
     {
-        if(getUserId())
-        {
-            binder << getValueOfUserId();
-        }
-        else
-        {
-            binder << nullptr;
-        }
-    }
-    if(dirtyFlag_[2])
-    {
         if(getName())
         {
             binder << getValueOfName();
@@ -474,7 +397,7 @@ void Tag::outputArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[3])
+    if(dirtyFlag_[2])
     {
         if(getCreatedAt())
         {
@@ -498,27 +421,12 @@ const std::vector<std::string> Tag::updateColumns() const
     {
         ret.push_back(getColumnName(2));
     }
-    if(dirtyFlag_[3])
-    {
-        ret.push_back(getColumnName(3));
-    }
     return ret;
 }
 
 void Tag::updateArgs(drogon::orm::internal::SqlBinder &binder) const
 {
     if(dirtyFlag_[1])
-    {
-        if(getUserId())
-        {
-            binder << getValueOfUserId();
-        }
-        else
-        {
-            binder << nullptr;
-        }
-    }
-    if(dirtyFlag_[2])
     {
         if(getName())
         {
@@ -529,7 +437,7 @@ void Tag::updateArgs(drogon::orm::internal::SqlBinder &binder) const
             binder << nullptr;
         }
     }
-    if(dirtyFlag_[3])
+    if(dirtyFlag_[2])
     {
         if(getCreatedAt())
         {
@@ -551,14 +459,6 @@ Json::Value Tag::toJson() const
     else
     {
         ret["id"]=Json::Value();
-    }
-    if(getUserId())
-    {
-        ret["user_id"]=(Json::Int64)getValueOfUserId();
-    }
-    else
-    {
-        ret["user_id"]=Json::Value();
     }
     if(getName())
     {
@@ -588,7 +488,7 @@ Json::Value Tag::toMasqueradedJson(
     const std::vector<std::string> &pMasqueradingVector) const
 {
     Json::Value ret;
-    if(pMasqueradingVector.size() == 4)
+    if(pMasqueradingVector.size() == 3)
     {
         if(!pMasqueradingVector[0].empty())
         {
@@ -603,9 +503,9 @@ Json::Value Tag::toMasqueradedJson(
         }
         if(!pMasqueradingVector[1].empty())
         {
-            if(getUserId())
+            if(getName())
             {
-                ret[pMasqueradingVector[1]]=(Json::Int64)getValueOfUserId();
+                ret[pMasqueradingVector[1]]=getValueOfName();
             }
             else
             {
@@ -614,24 +514,13 @@ Json::Value Tag::toMasqueradedJson(
         }
         if(!pMasqueradingVector[2].empty())
         {
-            if(getName())
+            if(getCreatedAt())
             {
-                ret[pMasqueradingVector[2]]=getValueOfName();
+                ret[pMasqueradingVector[2]]=getCreatedAt()->toDbStringLocal();
             }
             else
             {
                 ret[pMasqueradingVector[2]]=Json::Value();
-            }
-        }
-        if(!pMasqueradingVector[3].empty())
-        {
-            if(getCreatedAt())
-            {
-                ret[pMasqueradingVector[3]]=getCreatedAt()->toDbStringLocal();
-            }
-            else
-            {
-                ret[pMasqueradingVector[3]]=Json::Value();
             }
         }
         return ret;
@@ -644,14 +533,6 @@ Json::Value Tag::toMasqueradedJson(
     else
     {
         ret["id"]=Json::Value();
-    }
-    if(getUserId())
-    {
-        ret["user_id"]=(Json::Int64)getValueOfUserId();
-    }
-    else
-    {
-        ret["user_id"]=Json::Value();
     }
     if(getName())
     {
@@ -679,24 +560,19 @@ bool Tag::validateJsonForCreation(const Json::Value &pJson, std::string &err)
         if(!validJsonOfField(0, "id", pJson["id"], err, true))
             return false;
     }
-    if(pJson.isMember("user_id"))
+    if(pJson.isMember("name"))
     {
-        if(!validJsonOfField(1, "user_id", pJson["user_id"], err, true))
+        if(!validJsonOfField(1, "name", pJson["name"], err, true))
             return false;
     }
     else
     {
-        err="The user_id column cannot be null";
+        err="The name column cannot be null";
         return false;
-    }
-    if(pJson.isMember("name"))
-    {
-        if(!validJsonOfField(2, "name", pJson["name"], err, true))
-            return false;
     }
     if(pJson.isMember("created_at"))
     {
-        if(!validJsonOfField(3, "created_at", pJson["created_at"], err, true))
+        if(!validJsonOfField(2, "created_at", pJson["created_at"], err, true))
             return false;
     }
     return true;
@@ -705,7 +581,7 @@ bool Tag::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                                              const std::vector<std::string> &pMasqueradingVector,
                                              std::string &err)
 {
-    if(pMasqueradingVector.size() != 4)
+    if(pMasqueradingVector.size() != 3)
     {
         err = "Bad masquerading vector";
         return false;
@@ -740,14 +616,6 @@ bool Tag::validateMasqueradedJsonForCreation(const Json::Value &pJson,
                   return false;
           }
       }
-      if(!pMasqueradingVector[3].empty())
-      {
-          if(pJson.isMember(pMasqueradingVector[3]))
-          {
-              if(!validJsonOfField(3, pMasqueradingVector[3], pJson[pMasqueradingVector[3]], err, true))
-                  return false;
-          }
-      }
     }
     catch(const Json::LogicError &e)
     {
@@ -768,19 +636,14 @@ bool Tag::validateJsonForUpdate(const Json::Value &pJson, std::string &err)
         err = "The value of primary key must be set in the json object for update";
         return false;
     }
-    if(pJson.isMember("user_id"))
-    {
-        if(!validJsonOfField(1, "user_id", pJson["user_id"], err, false))
-            return false;
-    }
     if(pJson.isMember("name"))
     {
-        if(!validJsonOfField(2, "name", pJson["name"], err, false))
+        if(!validJsonOfField(1, "name", pJson["name"], err, false))
             return false;
     }
     if(pJson.isMember("created_at"))
     {
-        if(!validJsonOfField(3, "created_at", pJson["created_at"], err, false))
+        if(!validJsonOfField(2, "created_at", pJson["created_at"], err, false))
             return false;
     }
     return true;
@@ -789,7 +652,7 @@ bool Tag::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
                                            const std::vector<std::string> &pMasqueradingVector,
                                            std::string &err)
 {
-    if(pMasqueradingVector.size() != 4)
+    if(pMasqueradingVector.size() != 3)
     {
         err = "Bad masquerading vector";
         return false;
@@ -813,11 +676,6 @@ bool Tag::validateMasqueradedJsonForUpdate(const Json::Value &pJson,
       if(!pMasqueradingVector[2].empty() && pJson.isMember(pMasqueradingVector[2]))
       {
           if(!validJsonOfField(2, pMasqueradingVector[2], pJson[pMasqueradingVector[2]], err, false))
-              return false;
-      }
-      if(!pMasqueradingVector[3].empty() && pJson.isMember(pMasqueradingVector[3]))
-      {
-          if(!validJsonOfField(3, pMasqueradingVector[3], pJson[pMasqueradingVector[3]], err, false))
               return false;
       }
     }
@@ -859,17 +717,6 @@ bool Tag::validJsonOfField(size_t index,
                 err="The " + fieldName + " column cannot be null";
                 return false;
             }
-            if(!pJson.isInt64())
-            {
-                err="Type error in the "+fieldName+" field";
-                return false;
-            }
-            break;
-        case 2:
-            if(pJson.isNull())
-            {
-                return true;
-            }
             if(!pJson.isString())
             {
                 err="Type error in the "+fieldName+" field";
@@ -884,7 +731,7 @@ bool Tag::validJsonOfField(size_t index,
                 return false;
             }
             break;
-        case 3:
+        case 2:
             if(pJson.isNull())
             {
                 return true;

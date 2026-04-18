@@ -36,12 +36,10 @@
 | /api/note/detail   | GET  | [获取笔记详情](#25-获取笔记详情-get-apinotedetail)      |
 | /api/note/search   | GET  | [全文搜索](#26-全文搜索笔记-get-apinotesearch)         |
 |                    |      |                 |
-| /api/tag/create    | POST | [创建标签](#31-创建标签-post-apitagcreate)           |
-| /api/tag/list      | GET  | [获取标签列表](#32-获取标签列表-get-apitaglist)         |
-| /api/tag/bind      | POST | [绑定/解除笔记标签](#33-绑定笔记标签-post-apitagbind)   |
-| /api/tag/update    | POST | [更新标签](#34-更新标签-post-apitagupdate)           |
-| /api/tag/delete    | POST | [删除标签](#35-删除标签-post-apitagdelete)           |
-| /api/folder/create | POST | [创建文件夹](#36-创建文件夹-post-apifoldercreate)           |
+| /api/notes/{id}/tags    | GET  | [获取笔记标签](#27-获取笔记标签列表-get-apinotesidtags)         |
+| /api/notes/{id}/tags/ai | POST | [AI生成标签](#28-ai生成笔记标签-post-apinotesidtagsai)   |
+| /api/tags/hot           | GET  | [获取热门标签](#31-获取热门标签-get-apitagshot)           |
+| /api/folder/create      | POST | [创建文件夹](#36-创建文件夹-post-apifoldercreate)           |
 | /api/folder/list   | GET  | [获取文件夹列表](#39-获取文件夹列表-get-apifolderlist)         |
 | /api/folder/update | POST | [更新文件夹](#37-更新文件夹-post-apifolderupdate)           |
 | /api/folder/delete | POST | [删除文件夹](#38-删除文件夹-post-apifolderdelete)           |
@@ -170,14 +168,16 @@ Header: `Authorization: Bearer {token}`
 
 ## 2. 笔记管理 API（核心）
 
-| 接口               | 方法   | 说明       |
-| ---------------- | ---- | -------- |
-| /api/note/create | POST | 新建笔记   |
-| /api/note/update | POST | 更新笔记   |
-| /api/note/delete | POST | 删除笔记   |
-| /api/note/list   | GET  | 获取笔记列表 |
-| /api/note/detail | GET  | 获取笔记详情 |
-| /api/note/search | GET  | 全文搜索   |
+| 接口                      | 方法   | 说明         |
+| ------------------------- | ------ | ------------ |
+| /api/note/create          | POST   | 新建笔记     |
+| /api/note/update          | POST   | 更新笔记     |
+| /api/note/delete          | POST   | 删除笔记     |
+| /api/note/list            | GET    | 获取笔记列表 |
+| /api/note/detail          | GET    | 获取笔记详情 |
+| /api/note/search          | GET    | 全文搜索     |
+| /api/notes/{id}/tags      | GET    | 获取笔记标签 |
+| /api/notes/{id}/tags/ai   | POST   | AI生成标签   |
 
 **鉴权要求：** 所有笔记接口均需通过 Token 鉴权
 
@@ -288,7 +288,6 @@ Header: `Authorization: Bearer {token}`
 | 参数       | 类型   | 必填 | 说明                                               |
 | ---------- | ------ | ------ | -------------------------------------------------- |
 | folder_id | int64  | 否     | 文件夹ID，0表示所有笔记，不传表示未分类笔记       |
-| tag_ids   | string | 否     | 标签ID数组，用逗号分隔，如 "1,2,3"，空表示不过滤 |
 
 **响应示例：**
 ```json
@@ -380,6 +379,65 @@ Header: `Authorization: Bearer {token}`
 - `score`: 匹配相关度分数
 - 响应不包含完整 `content` 字段，需要详情请调用 `/api/note/detail`
 
+### 2.7 获取笔记标签列表 GET /api/notes/{id}/tags
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求参数：**
+| 参数 | 类型  | 必填 | 说明             |
+| ---- | ----- | ---- | ---------------- |
+| id   | int64 | 是   | 笔记ID（路径参数）|
+
+**响应示例：**
+```json
+{
+  "code": 0,
+  "message": "获取标签列表成功",
+  "data": [
+    {
+      "id": 1,
+      "name": "Java"
+    },
+    {
+      "id": 2,
+      "name": "SpringBoot"
+    }
+  ]
+}
+```
+
+### 2.8 AI 生成笔记标签 POST /api/notes/{id}/tags/ai
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求参数：**
+| 参数 | 类型  | 必填 | 说明             |
+| ---- | ----- | ---- | ---------------- |
+| id   | int64 | 是   | 笔记ID（路径参数）|
+
+**响应示例：**
+```json
+{
+  "code": 0,
+  "message": "AI标签生成并保存成功",
+  "data": [
+    {
+      "name": "Java"
+    },
+    {
+      "name": "SpringBoot"
+    },
+    {
+      "name": "微服务"
+    }
+  ]
+}
+```
+
+> 注：该接口会调用 DsService（DeepSeek API）根据笔记内容推荐标签，自动替换该笔记原有标签，并同步更新 Elasticsearch。
+
 ---
 
 ## Elasticsearch 集成说明
@@ -429,164 +487,52 @@ Header: `Authorization: Bearer {token}`
 
 ## 3. 标签与分类 API
 
-| 接口             | 方法   | 说明               |
-| ---------------- | ---- | ------------------ |
-| /api/tag/create    | POST | 创建标签           |
-| /api/tag/list      | GET  | 获取标签列表         |
-| /api/tag/bind      | POST | 绑定/解除笔记标签   |
-| /api/tag/update    | POST | 更新标签           |
-| /api/tag/delete    | POST | 删除标签           |
-| /api/folder/create | POST | 创建文件夹           |
-| /api/folder/list   | GET  | 获取文件夹列表         |
-| /api/folder/update | POST | 更新文件夹           |
-| /api/folder/delete | POST | 删除文件夹           |
+| 接口               | 方法   | 说明               |
+| ------------------ | ------ | ------------------ |
+| /api/tags/hot      | GET    | 获取热门标签       |
+| /api/folder/create | POST   | 创建文件夹         |
+| /api/folder/list   | GET    | 获取文件夹列表     |
+| /api/folder/update | POST   | 更新文件夹         |
+| /api/folder/delete | POST   | 删除文件夹         |
 
+> **废弃说明：** 以下旧版标签接口已废弃，请使用笔记标签相关接口替代：
+> - ~~POST /api/tag/create~~
+> - ~~GET /api/tag/list~~
+> - ~~POST /api/tag/bind~~
+> - ~~POST /api/tag/update~~
+> - ~~POST /api/tag/delete~~
 
 **鉴权要求：** 所有接口均需通过 Token 鉴权
 
-### 3.1 创建标签 POST /api/tag/create
+### 3.1 获取热门标签 GET /api/tags/hot
 
 **请求方式：**
 Header: `Authorization: Bearer {token}`
 
-**请求示例：**
-```json
-{
-  "name": "工作"
-}
-```
-
-**请求参数：**
-| 参数 | 类型   | 必填 | 说明     |
-| ---- | ------ | ------ | -------- |
-| name | string | 是     | 标签名称 |
+**请求参数：** 无
 
 **响应示例：**
 ```json
 {
   "code": 0,
-  "message": "创建标签成功",
-  "data": {
-    "tag_id": 1
-  }
-}
-```
-
-### 3.2 获取标签列表 GET /api/tag/list
-
-**请求方式：**
-Header: `Authorization: Bearer {token}`
-
-**请求参数：**
-| 参数     | 类型   | 必填 | 说明                                      |
-| -------- | ------ | ------ | ----------------------------------------- |
-| note_id  | int64  | 否     | 笔记ID，不传则返回用户所有标签，传则返回该笔记关联的标签 |
-
-**响应示例：**
-```json
-{
-  "code": 0,
-  "message": "获取标签列表成功",
+  "message": "获取热门标签成功",
   "data": [
     {
-      "id": 1,
-      "name": "工作",
-      "created_at": "2025-01-01 12:00:00"
+      "tag": "Java",
+      "count": 42
     },
     {
-      "id": 2,
-      "name": "学习",
-      "created_at": "2025-01-02 14:30:00"
+      "tag": "SpringBoot",
+      "count": 35
     }
   ]
 }
 ```
 
-### 3.3 绑定笔记标签 POST /api/tag/bind
-
-**请求方式：**
-Header: `Authorization: Bearer {token}`
-
-**请求示例：**
-```json
-{
-  "note_id": 1,
-  "tag_ids": [1, 2, 3]
-}
-```
-
-**请求参数：**
-| 参数    | 类型         | 必填 | 说明                                     |
-| ------- | ------------ | ------ | ---------------------------------------- |
-| note_id | int64        | 是     | 笔记ID                                   |
-| tag_ids | array&lt;int&gt; | 否     | 标签ID数组，空数组 [] 表示清除所有标签 |
-
-**响应示例：**
-```json
-{
-  "code": 0,
-  "message": "绑定标签成功",
-  "data": {}
-}
-```
-
-> 注：该接口会先清除该笔记的所有标签，然后绑定新的标签。如需清除所有标签，传入 `tag_ids: []` 即可。
-
-### 3.4 更新标签 POST /api/tag/update
-
-**请求方式：**
-Header: `Authorization: Bearer {token}`
-
-**请求示例：**
-```json
-{
-  "tag_id": 1,
-  "name": "新标签名"
-}
-```
-
-**请求参数：**
-| 参数    | 类型   | 必填 | 说明       |
-| ------- | ------ | ------ | ---------- |
-| tag_id  | int64  | 是     | 待更新的标签ID |
-| name    | string | 是     | 新的标签名称   |
-
-**响应示例：**
-```json
-{
-  "code": 0,
-  "message": "更新标签成功",
-  "data": {}
-}
-```
-
-### 3.5 删除标签 POST /api/tag/delete
-
-**请求方式：**
-Header: `Authorization: Bearer {token}`
-
-**请求示例：**
-```json
-{
-  "tag_id": 1
-}
-```
-
-**请求参数：**
-| 参数    | 类型  | 必填 | 说明      |
-| ------- | ----- | ------ | --------- |
-| tag_id  | int64 | 是     | 待删除的标签ID |
-
-**响应示例：**
-```json
-{
-  "code": 0,
-  "message": "删除标签成功",
-  "data": {}
-}
-```
-
-> 注：删除标签时会同时清除该标签与所有笔记的关联关系
+**说明：**
+- 基于 Elasticsearch 聚合查询，统计近 7 天内公开笔记的标签使用情况
+- 返回 Top 10 热门标签及其出现次数
+- 数据来源：`notes` 索引，`tags` 字段（`keyword` 类型）
 
 ### 3.6 创建文件夹 POST /api/folder/create
 

@@ -39,42 +39,6 @@ void NoteController::verifyTokenAndGetUserId(const HttpRequestPtr &req, std::fun
       });
 }
 
-void NoteController::getNoteTags(int64_t noteId, std::function<void(std::vector<std::string>)> callback) {
-  auto dbClient = drogon::app().getDbClient("default");
-  std::string sql = 
-    "SELECT t.name FROM tag t "
-    "INNER JOIN note_tag nt ON t.id = nt.tag_id "
-    "WHERE nt.note_id = ?";
-  
-  dbClient->execSqlAsync(
-    sql,
-    [callback](const drogon::orm::Result &result) {
-      std::vector<std::string> tags;
-      for (const auto &row : result) {
-        tags.push_back(row["name"].as<std::string>());
-      }
-      callback(tags);
-    },
-    [callback](const drogon::orm::DrogonDbException &e) {
-      LOG_ERROR << "Failed to get note tags: " << e.base().what();
-      callback({});
-    },
-    noteId
-  );
-}
-
-void NoteController::indexNoteToES(int64_t noteId, int64_t userId, const drogon_model::calcite::Note& note,
-                                   const std::vector<std::string>& tags) {
-  esClient_.indexDocument(
-    noteId,
-    userId,
-    note.getValueOfTitle(),
-    note.getValueOfContent(),
-    note.getValueOfSummary(),
-    tags
-  );
-}
-
 void NoteController::createNote(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
   verifyTokenAndGetUserId(req, [this, req, callback](bool valid, int64_t userId)
       {
@@ -92,12 +56,12 @@ void NoteController::createNote(const HttpRequestPtr &req, std::function<void(co
         }
 
         std::string title    = json->get("title", "").asString();
-        std::string content  = json->get("content", "").asString();
-        std::string summary  = json->get("summary", "").asString();
+        // std::string content  = json->get("content", "").asString();
+        // std::string summary  = json->get("summary", "").asString();
         int64_t     folderId = json->get("folder_id", 0).asInt64();
 
         if (title.empty()) {
-          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "标题和内容不能为空"));
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "标题不能为空"));
           callback(resp);
           return;
         }
@@ -106,20 +70,18 @@ void NoteController::createNote(const HttpRequestPtr &req, std::function<void(co
         drogon_model::calcite::Note note;
         note.setUserId(userId);
         note.setTitle(title);
-        note.setContent(content);
-        note.setSummary(summary);
         note.setFolderId(folderId);
         
         drogon::orm::Mapper<drogon_model::calcite::Note> noteMapper(drogon::app().getDbClient("default"));
         noteMapper.insert(
             note,
-            [this, callback, userId](const drogon_model::calcite::Note &insertedNote)
+            [this, callback, userId, title](const drogon_model::calcite::Note &insertedNote)
             {
               int64_t noteId = insertedNote.getValueOfId();
               
               // 异步索引到ES（空标签列表，因为新笔记还没有标签）默认不公开
-              indexNoteToES(noteId, userId, insertedNote, {});
-              
+              esClient_.indexDocument(noteId, userId, title);
+
               Json::Value data;
               data["note_id"] = static_cast<Json::Int64>(noteId);
               auto resp       = HttpResponse::newHttpJsonResponse(createResponse(0, "创建笔记成功", data));
@@ -192,7 +154,8 @@ void NoteController::updateNote(const HttpRequestPtr &req, std::function<void(co
                     const std::string* pSummary = summary.empty() ? nullptr : &summary;
                     const bool* pIsPublic = isPublic ? &isPublic : nullptr;
                     
-                    esClient_.updateDocument(noteId, pTitle, pContent, pSummary, nullptr, pIsPublic);
+                    // TODO 标签更新后也要更新ES，目前先不处理标签更新
+                    esClient_.updateDocument(noteId, pTitle, pContent, pSummary, {}, pIsPublic);
                     
                     auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "更新笔记成功"));
                     callback(resp);
@@ -274,133 +237,59 @@ void NoteController::deleteNote(const HttpRequestPtr &req, std::function<void(co
 }
 
 void NoteController::listNotes(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
-  verifyTokenAndGetUserId(req, [this, req, callback](bool valid, int64_t userId)
-      {
+    verifyTokenAndGetUserId(req, [this, req, callback](bool valid, int64_t userId) {
         if (!valid) {
-          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "Token无效或已过期"));
-          callback(resp);
-          return;
+            auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "Token无效或已过期"));
+            callback(resp);
+            return;
         }
 
+        // ====================== 核心：获取 folder_id ======================
         std::string folderIdStr = req->getParameter("folder_id");
-        int64_t     folderId    = folderIdStr.empty() ? 0 : std::stoll(folderIdStr);
-
-        std::string          tagIdsStr = req->getParameter("tag_ids");
-        std::vector<int64_t> tagIds;
-        if (!tagIdsStr.empty()) {
-          std::stringstream ss(tagIdsStr);
-          std::string       item;
-          while (std::getline(ss, item, ',')) {
+        int64_t folderId = 0;
+        if (!folderIdStr.empty()) {
             try {
-              if (!item.empty())
-                tagIds.push_back(std::stoll(item));
+                folderId = std::stoll(folderIdStr);
             } catch (...) {
-              // 忽略无效的tag_id
+                folderId = 0; // 非法参数默认 0
             }
-          }
         }
 
-        auto dbClient = drogon::app().getDbClient("default");
+        // ====================== Drogon ORM 零 SQL 查询 ======================
+        auto mapper = drogon::orm::Mapper<drogon_model::calcite::Note>(drogon::app().getDbClient());
 
-        // 构建基础查询条件
-        std::string whereClause    = "WHERE user_id = ? AND is_deleted = 0";
-        bool        hasFolderParam = false;
+        // 拼接条件：userId = ? AND isDeleted = 0 AND folderId = ?
+        auto criteria = drogon::orm::Criteria(drogon_model::calcite::Note::Cols::_user_id, userId)
+                      && drogon::orm::Criteria(drogon_model::calcite::Note::Cols::_is_deleted, 0)
+                      && drogon::orm::Criteria(drogon_model::calcite::Note::Cols::_folder_id, folderId);
 
-        // 添加 folder_id 过滤
-        if (folderId >= 0) {
-          whereClause += " AND folder_id = ?";
-          hasFolderParam = true;
-        } 
-        // else if (folderId == 0 && !folderIdStr.empty()) {
-        //   // 0 表示查询未分类的笔记（folder_id IS NULL）
-        //   whereClause += " AND folder_id IS NULL";
-        // }
-
-        // 添加 tag_ids 过滤
-        if (!tagIds.empty()) {
-          // 构建标签过滤子查询
-          std::string tagIdsStrForSql;
-          for (size_t i = 0; i < tagIds.size(); ++i) {
-            if (i > 0) tagIdsStrForSql += ",";
-            tagIdsStrForSql += std::to_string(tagIds[i]);
-          }
-
-          std::string subQuery =
-              " AND id IN ("
-              "  SELECT note_id"
-              "  FROM note_tag"
-              "  WHERE tag_id IN (" +
-              tagIdsStrForSql + ")"
-                                "  GROUP BY note_id"
-                                "  HAVING COUNT(DISTINCT tag_id) = " +
-              std::to_string(tagIds.size()) +
-              ")";
-
-          whereClause += subQuery;
-        }
-
-        // 执行查询
-        std::string sql = "SELECT id, title, summary, folder_id, created_at, updated_at FROM note " + whereClause;
-
-        // 根据是否有 folderId 参数选择调用方式
-        std::cout<<sql<<'\n';
-        if (hasFolderParam) {
-          dbClient->execSqlAsync(
-              sql,
-              [callback, this](const drogon::orm::Result &result)
-              {
+        // 异步查询
+        mapper.findBy(
+            criteria,
+            [this,callback](const std::vector<drogon_model::calcite::Note> &notes) {
                 Json::Value data(Json::arrayValue);
-                for (size_t i = 0; i < result.size(); ++i) {
-                  const auto &row = result[i];
-                  Json::Value noteJson;
-                  noteJson["id"]         = static_cast<Json::Int64>(row["id"].as<int64_t>());
-                  noteJson["title"]      = row["title"].as<std::string>();
-                  noteJson["summary"]    = row["summary"].isNull() ? "" : row["summary"].as<std::string>();
-                  noteJson["folder_id"]  = row["folder_id"].isNull() ? 0 : static_cast<Json::Int64>(row["folder_id"].as<int64_t>());
-                  noteJson["created_at"] = row["created_at"].as<std::string>();
-                  noteJson["updated_at"] = row["updated_at"].as<std::string>();
-                  data.append(noteJson);
+
+                // 直接遍历 ORM 对象，不用处理 Result
+                for (const auto &note : notes) {
+                    Json::Value obj;
+                    obj["id"]         = note.getValueOfId();
+                    obj["title"]      = note.getValueOfTitle();
+                    obj["summary"]    = note.getValueOfSummary();
+                    obj["folder_id"]  = (Json::Int64)note.getValueOfFolderId();
+                    obj["created_at"] = note.getValueOfCreatedAt().toDbStringLocal();
+                    obj["updated_at"] = note.getValueOfUpdatedAt().toDbStringLocal();
+                    data.append(obj);
                 }
 
-                auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "获取笔记列表成功", data));
+                auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "获取成功", data));
                 callback(resp);
-              },
-              [callback, this](const drogon::orm::DrogonDbException &e)
-              {
-                auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "获取笔记列表失败: " + std::string(e.base().what())));
+            },
+            [this,callback](const drogon::orm::DrogonDbException &e) {
+                auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "获取失败：" + std::string(e.base().what())));
                 callback(resp);
-              },
-              userId,
-              folderId);
-        } else {
-          dbClient->execSqlAsync(
-              sql,
-              [callback, this](const drogon::orm::Result &result)
-              {
-                Json::Value data(Json::arrayValue);
-                for (size_t i = 0; i < result.size(); ++i) {
-                  const auto &row = result[i];
-                  Json::Value noteJson;
-                  noteJson["id"]         = static_cast<Json::Int64>(row["id"].as<int64_t>());
-                  noteJson["title"]      = row["title"].as<std::string>();
-                  noteJson["summary"]    = row["summary"].isNull() ? "" : row["summary"].as<std::string>();
-                  noteJson["folder_id"]  = row["folder_id"].isNull() ? 0 : static_cast<Json::Int64>(row["folder_id"].as<int64_t>());
-                  noteJson["created_at"] = row["created_at"].as<std::string>();
-                  noteJson["updated_at"] = row["updated_at"].as<std::string>();
-                  data.append(noteJson);
-                }
-
-                auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "获取笔记列表成功", data));
-                callback(resp);
-              },
-              [callback, this](const drogon::orm::DrogonDbException &e)
-              {
-                auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "获取笔记列表失败: " + std::string(e.base().what())));
-                callback(resp);
-              },
-              userId);
-        }
-      });
+            }
+        );
+    });
 }
 
 void NoteController::getNoteDetail(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
@@ -427,7 +316,7 @@ void NoteController::getNoteDetail(const HttpRequestPtr &req, std::function<void
             noteId,
             [callback, this, userId](const drogon_model::calcite::Note &note)
             {
-              if (note.getValueOfUserId() != userId) {
+              if (note.getValueOfUserId() != userId && note.getIsPublic() == 0) {
                 auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "无权访问该笔记"));
                 callback(resp);
                 return;
@@ -445,6 +334,7 @@ void NoteController::getNoteDetail(const HttpRequestPtr &req, std::function<void
               if (note.getUpdatedAt()) {
                 data["updated_at"] = note.getUpdatedAt()->toDbStringLocal();
               }
+              data["is_public"] = note.getValueOfIsPublic();
 
               auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "获取笔记详情成功", data));
               callback(resp);
@@ -520,6 +410,220 @@ void NoteController::searchNotes(const HttpRequestPtr &req, std::function<void(c
           from, size
         );
       });
+}
+
+void NoteController::getNoteTagsHandler(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
+  verifyTokenAndGetUserId(req, [this, req, callback](bool valid, int64_t userId) {
+    if (!valid) {
+      auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "Token无效或已过期"));
+      callback(resp);
+      return;
+    }
+
+    std::string noteIdStr = req->getParameter("note_id");
+    if (noteIdStr.empty()) {
+      auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "笔记ID不能为空"));
+      callback(resp);
+      return;
+    }
+
+    int64_t noteId;
+    try {
+      noteId = std::stoll(noteIdStr);
+    } catch (...) {
+      auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "笔记ID格式错误"));
+      callback(resp);
+      return;
+    }
+
+    auto dbClient = drogon::app().getDbClient("default");
+
+    drogon::orm::Mapper<drogon_model::calcite::Note> noteMapper(dbClient);
+    noteMapper.findByPrimaryKey(
+      noteId,
+      [this, noteId, userId, callback, dbClient](const drogon_model::calcite::Note &note) {
+        if (note.getValueOfUserId() != userId && note.getValueOfIsPublic() == 0) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "无权访问该笔记"));
+          callback(resp);
+          return;
+        }
+
+        drogon::orm::Mapper<drogon_model::calcite::NoteTag> noteTagMapper(dbClient);
+        noteTagMapper.findBy(
+          drogon::orm::Criteria(drogon_model::calcite::NoteTag::Cols::_note_id, noteId),
+          [this, callback, dbClient](const std::vector<drogon_model::calcite::NoteTag> &noteTags) {
+            if (noteTags.empty()) {
+              auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "获取标签列表成功", Json::Value(Json::arrayValue)));
+              callback(resp);
+              return;
+            }
+
+            std::vector<int64_t> tagIds;
+            for (const auto &nt : noteTags) {
+              tagIds.push_back(nt.getValueOfTagId());
+            }
+
+            drogon::orm::Mapper<drogon_model::calcite::Tag> tagMapper(dbClient);
+            auto criteria = drogon::orm::Criteria(drogon_model::calcite::Tag::Cols::_id, drogon::orm::CompareOperator::In, tagIds);
+            tagMapper.findBy(
+              criteria,
+              [this, callback](const std::vector<drogon_model::calcite::Tag> &tags) {
+                Json::Value data(Json::arrayValue);
+                for (const auto &tag : tags) {
+                  Json::Value obj;
+                  obj["id"] = static_cast<Json::Int64>(tag.getValueOfId());
+                  obj["name"] = tag.getValueOfName();
+                  data.append(obj);
+                }
+                auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "获取标签列表成功", data));
+                callback(resp);
+              },
+              [this, callback](const drogon::orm::DrogonDbException &e) {
+                auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "获取标签详情失败: " + std::string(e.base().what())));
+                callback(resp);
+              });
+          },
+          [this, callback](const drogon::orm::DrogonDbException &e) {
+            auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "获取标签关联失败: " + std::string(e.base().what())));
+            callback(resp);
+          });
+      },
+      [this, callback](const drogon::orm::DrogonDbException &e) {
+        auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "笔记不存在"));
+        callback(resp);
+      });
+  });
+}
+
+void NoteController::generateNoteTagsByAi(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback) {
+  verifyTokenAndGetUserId(req, [this, req, callback](bool valid, int64_t userId) {
+    if (!valid) {
+      auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "Token无效或已过期"));
+      callback(resp);
+      return;
+    }
+
+    std::string noteIdStr = req->getParameter("note_id");
+    if (noteIdStr.empty()) {
+      auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "笔记ID不能为空"));
+      callback(resp);
+      return;
+    }
+
+    int64_t noteId;
+    try {
+      noteId = std::stoll(noteIdStr);
+    } catch (...) {
+      auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "笔记ID格式错误"));
+      callback(resp);
+      return;
+    }
+
+    auto dbClient = drogon::app().getDbClient("default");
+
+    drogon::orm::Mapper<drogon_model::calcite::Note> noteMapper(dbClient);
+    noteMapper.findByPrimaryKey(
+      noteId,
+      [this, noteId, userId, callback, dbClient](const drogon_model::calcite::Note &note) {
+        if (note.getValueOfUserId() != userId) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "无权访问该笔记"));
+          callback(resp);
+          return;
+        }
+
+        std::string content = note.getValueOfContent();
+        if (content.empty()) {
+          auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "笔记内容为空，无法生成标签"));
+          callback(resp);
+          return;
+        }
+
+        std::cout<<"crash Here?"<<'\n';
+        dsService_.recommendTags(content, [this, noteId, callback, dbClient](const calcite::services::TagRecommendationResult &result) {
+        std::cout<<"crash Not Here."<<'\n';
+          if (!result.success) {
+            auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "AI标签生成失败: " + result.errorMessage));
+            callback(resp);
+            return;
+          }
+
+          if (result.tags.empty()) {
+            auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "AI标签生成成功", Json::Value(Json::arrayValue)));
+            callback(resp);
+            return;
+          }
+
+          drogon::orm::Mapper<drogon_model::calcite::Tag> tagMapper(dbClient);
+          tagMapper.findBy(
+            drogon::orm::Criteria(drogon_model::calcite::Tag::Cols::_name, drogon::orm::CompareOperator::In, result.tags),
+            [this, noteId, callback, dbClient, result](const std::vector<drogon_model::calcite::Tag> &tags) {
+              std::cout<<"crash Not Here. tags size: "<<tags.size()<<'\n';
+              std::vector<int64_t> tagIds;
+              std::vector<std::string> tagNames;
+              for (const auto &tag : tags) {
+                tagIds.push_back(tag.getValueOfId());
+                tagNames.push_back(tag.getValueOfName());
+              }
+
+              if (tagIds.empty()) {
+                auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "AI标签生成成功", Json::Value(Json::arrayValue)));
+                callback(resp);
+                return;
+              }
+
+              drogon::orm::Mapper<drogon_model::calcite::NoteTag> noteTagMapper(dbClient);
+              noteTagMapper.deleteBy(
+                drogon::orm::Criteria(drogon_model::calcite::NoteTag::Cols::_note_id, noteId),
+                [this, noteId, callback, dbClient, tagIds, tagNames](size_t) {
+                  std::function<void(size_t)> doInsert = [&](size_t index) {
+                    if (index >= tagIds.size()) {
+                      esClient_.updateDocument(noteId, nullptr, nullptr, nullptr, tagNames, nullptr);
+                      Json::Value data(Json::arrayValue);
+                      for (const auto &name : tagNames) {
+                        Json::Value obj;
+                        obj["name"] = name;
+                        data.append(obj);
+                      }
+                      auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "AI标签生成并保存成功", data));
+                      callback(resp);
+                      return;
+                    }
+                    drogon_model::calcite::NoteTag nt;
+                    nt.setNoteId(noteId);
+                    nt.setTagId(tagIds[index]);
+                    drogon::orm::Mapper<drogon_model::calcite::NoteTag> insertMapper(dbClient);
+                    insertMapper.insert(
+                      nt,
+                      [doInsert, index](const drogon_model::calcite::NoteTag &) {
+                        doInsert(index + 1);
+                      },
+                      [this, callback](const drogon::orm::DrogonDbException &e) {
+                        LOG_ERROR << "NoteTag insert failed: " << e.base().what();
+                        auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "保存标签关联失败: " + std::string(e.base().what())));
+                        callback(resp);
+                      }
+                    );
+                  };
+                  doInsert(0);
+                },
+                [this, callback](const drogon::orm::DrogonDbException &e) {
+                  auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "清除旧标签关联失败: " + std::string(e.base().what())));
+                  callback(resp);
+                }
+              );
+            },
+            [this, callback](const drogon::orm::DrogonDbException &e) {
+              auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "查询标签失败: " + std::string(e.base().what())));
+              callback(resp);
+            }
+          );
+        });
+      },
+      [this, callback](const drogon::orm::DrogonDbException &e) {
+        auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "笔记不存在"));
+        callback(resp);
+      });
+  });
 }
 
 } // namespace v1

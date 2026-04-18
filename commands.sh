@@ -137,6 +137,21 @@ curl -X POST "localhost:9200/notes/_doc/2" -H 'Content-Type: application/json' -
 ./elasticsearch-plugin install https://get.infini.cloud/elasticsearch/analysis-ik/8.12.2
 
 
+# Test ES After update
+curl -X PUT \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1,
+    "title": "动了谁的蛋糕",
+    "content": "",
+    "summary": "",
+    "tags": [],
+    "is_public": false,
+    "created_at": "20260418 09:08:52",
+    "updated_at": "20260418 09:08:52"
+  }' \
+  "http://127.0.0.1:9200/notes/_doc/92"
+
 # ------------------------------------------------- install docker
 # 卸载旧版本（如果有）
 sudo apt remove docker docker.io containerd runc -y

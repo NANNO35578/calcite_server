@@ -235,8 +235,8 @@ void OcrController::indexNoteToES(int64_t noteId, int64_t userId, const drogon_m
     noteId,
     userId,
     note.getValueOfTitle(),
-    note.getValueOfContent(),
-    note.getValueOfSummary(),
+    &note.getValueOfContent(),
+    &note.getValueOfSummary(),
     tags
   );
 }

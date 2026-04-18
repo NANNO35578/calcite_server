@@ -4,6 +4,7 @@
 #include "../models/NoteTag.h"
 #include "../models/Tag.h"
 #include "../services/AuthService.h"
+#include "../services/DsService.h"
 #include "../utils/EsClient.h"
 #include <drogon/HttpController.h>
 
@@ -22,6 +23,8 @@ public:
   ADD_METHOD_TO(NoteController::listNotes, "/api/note/list", Get);
   ADD_METHOD_TO(NoteController::getNoteDetail, "/api/note/detail", Get);
   ADD_METHOD_TO(NoteController::searchNotes, "/api/note/search", Get);
+  ADD_METHOD_TO(NoteController::getNoteTagsHandler, "/api/notes/tags", Get);
+  ADD_METHOD_TO(NoteController::generateNoteTagsByAi, "/api/notes/tags/ai", Post);
   METHOD_LIST_END
 
   void createNote(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
@@ -30,24 +33,16 @@ public:
   void listNotes(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
   void getNoteDetail(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
   void searchNotes(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
+  void getNoteTagsHandler(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
+  void generateNoteTagsByAi(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);
 
 private:
   services::AuthService authService_;
-  utils::EsClient esClient_;
+  services::DsService   dsService_;
+  utils::EsClient       esClient_;
 
   Json::Value createResponse(int code, const std::string &message, const Json::Value &data = Json::Value());
   void        verifyTokenAndGetUserId(const HttpRequestPtr &req, std::function<void(bool, int64_t)> callback);
-  
-  /**
-   * 获取笔记的标签列表
-   */
-  void getNoteTags(int64_t noteId, std::function<void(std::vector<std::string>)> callback);
-  
-  /**
-   * 异步索引笔记到ES
-   */
-  void indexNoteToES(int64_t noteId, int64_t userId, const drogon_model::calcite::Note& note, 
-                     const std::vector<std::string>& tags);
 };
 
 } // namespace v1

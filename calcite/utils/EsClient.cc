@@ -14,10 +14,12 @@ EsClient::EsClient(const std::string& host, const std::string& indexName)
       indexName_(indexName) {
 }
 
-std::string EsClient::escapeJson(const std::string& str) {
+std::string EsClient::escapeJson(const std::string* str) {
+    if(!str) return "";
+    
     std::string result;
-    result.reserve(str.size());
-    for (char c : str) {
+    result.reserve(str->size());
+    for (char c : *str) {
         switch (c) {
             case '"': result += "\\\""; break;
             case '\\': result += "\\\\"; break;
@@ -39,27 +41,39 @@ std::string EsClient::escapeJson(const std::string& str) {
 }
 
 std::string EsClient::buildDocumentJson(int64_t userId,
-                                        const std::string& title,
-                                        const std::string& content,
-                                        const std::string& summary,
+                                        const std::string* title,
+                                        const std::string* content,
+                                        const std::string* summary,
                                         const std::vector<std::string>& tags,
                                         bool isPublic) {
     std::ostringstream oss;
-    auto now = trantor::Date::now().toFormattedString(false);
+
+    // ✅ 修复：使用 trantor 官方接口生成 ES 标准日期格式（UTC 时间）
+    auto now = trantor::Date::now();
+    char timeBuf[32] = {0};
+    now.toCustomFormattedString("%Y-%m-%dT%H:%M:%S", timeBuf, sizeof(timeBuf));
+    std::string nowFormat = timeBuf;
+
+    // std::cout << "Current time for ES document: " << nowFormat << std::endl;
+
     oss << "{";
     oss << "\"user_id\":" << userId << ",";
     oss << "\"title\":\"" << escapeJson(title) << "\",";
     oss << "\"content\":\"" << escapeJson(content) << "\",";
     oss << "\"summary\":\"" << escapeJson(summary) << "\",";
     oss << "\"tags\":[";
-    for (size_t i = 0; i < tags.size(); ++i) {
+    if (tags.empty()) {
+      oss << "],";
+    } else {
+      for (size_t i = 0; i < tags.size(); ++i) {
         if (i > 0) oss << ",";
-        oss << "\"" << escapeJson(tags[i]) << "\"";
+        oss << "\"" << escapeJson(&(tags[i])) << "\"";
+      }
     }
     oss << "],";
     oss << "\"is_public\":" << (isPublic ? "true" : "false") << ",";
-    oss << "\"created_at\":\"" << now << "\",";
-    oss << "\"updated_at\":\"" << now << "\"";
+    oss << "\"created_at\":\"" << nowFormat << "\",";
+    oss << "\"updated_at\":\"" << nowFormat << "\"";
     oss << "}";
     return oss.str();
 }
@@ -67,8 +81,8 @@ std::string EsClient::buildDocumentJson(int64_t userId,
 void EsClient::indexDocument(int64_t noteId,
                              int64_t userId,
                              const std::string& title,
-                             const std::string& content,
-                             const std::string& summary,
+                             const std::string* content,
+                             const std::string* summary,
                              const std::vector<std::string>& tags,
                              bool isPublic) {
     auto req = HttpRequest::newHttpRequest();
@@ -76,7 +90,7 @@ void EsClient::indexDocument(int64_t noteId,
     req->setPath("/" + indexName_ + "/_doc/" + std::to_string(noteId));
     req->setContentTypeCode(CT_APPLICATION_JSON);
     
-    std::string json = buildDocumentJson(userId, title, content, summary, tags, isPublic);
+    std::string json = buildDocumentJson(userId, &title, content, summary, tags, isPublic);
     req->setBody(json);
 
     client_->sendRequest(req, [noteId](ReqResult result, const HttpResponsePtr& resp) {
@@ -94,7 +108,7 @@ void EsClient::updateDocument(int64_t noteId,
                               const std::string* title,
                               const std::string* content,
                               const std::string* summary,
-                              const std::vector<std::string>* tags,
+                              const std::vector<std::string>& tags,
                               const bool* isPublic) {
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(Post);
@@ -104,41 +118,43 @@ void EsClient::updateDocument(int64_t noteId,
     std::ostringstream oss;
     oss << "{\"doc\":{";
     bool first = true;
-    
+
     if (title) {
-        if (!first) oss << ",";
-        oss << "\"title\":\"" << escapeJson(*title) << "\"";
-        first = false;
+      if (!first) oss << ",";
+      oss << "\"title\":\"" << escapeJson(title) << "\"";
+      first = false;
     }
     if (content) {
-        if (!first) oss << ",";
-        oss << "\"content\":\"" << escapeJson(*content) << "\"";
-        first = false;
+      if (!first) oss << ",";
+      oss << "\"content\":\"" << escapeJson(content) << "\"";
+      first = false;
     }
     if (summary) {
-        if (!first) oss << ",";
-        oss << "\"summary\":\"" << escapeJson(*summary) << "\"";
-        first = false;
+      if (!first) oss << ",";
+      oss << "\"summary\":\"" << escapeJson(summary) << "\"";
+      first = false;
     }
-    if (tags) {
-        if (!first) oss << ",";
-        oss << "\"tags\":[";
-        for (size_t i = 0; i < tags->size(); ++i) {
-            if (i > 0) oss << ",";
-            oss << "\"" << escapeJson((*tags)[i]) << "\"";
-        }
-        oss << "]";
-        first = false;
+    if (!tags.empty()) {
+      if (!first) oss << ",";
+      oss << "\"tags\":[";
+      for (size_t i = 0; i < tags.size(); ++i) {
+        if (i > 0) oss << ",";
+        oss << "\"" << escapeJson(&(tags[i])) << "\"";
+      }
+      oss << "]";
+      first = false;
     }
     if (isPublic) {
-        if (!first) oss << ",";
-        oss << "\"is_public\":" << (*isPublic ? "true" : "false");
-        first = false;
+      if (!first) oss << ",";
+      oss << "\"is_public\":" << (*isPublic ? "true" : "false");
+      first = false;
     }
     // 总是更新 updated_at
     if (!first) oss << ",";
-    oss << "\"updated_at\":\"" << trantor::Date::now().toFormattedString(false) << "\"";
-    
+    char timeBuf[32] = {0};
+    trantor::Date::now().toCustomFormattedString("%Y-%m-%dT%H:%M:%S", timeBuf, sizeof(timeBuf));
+    oss << "\"updated_at\":\"" << std::string(timeBuf) << "\"";
+
     oss << "}}";
     req->setBody(oss.str());
 
@@ -210,7 +226,7 @@ void EsClient::search(int64_t userId,
                 "must": [
                     {
                         "multi_match": {
-                            "query": ")" + escapeJson(keyword) + R"(",
+                            "query": ")" + escapeJson(&keyword) + R"(",
                             "fields": ["title^3", "content", "summary^2", "tags^2"],
                             "type": "best_fields",
                             "fuzziness": "AUTO"
