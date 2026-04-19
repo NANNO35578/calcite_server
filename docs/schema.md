@@ -1,4 +1,4 @@
-## 数据库表结构设计（核心 8 张表）
+## 数据库表结构设计（核心 13 张表）
 
 ### 建库
 
@@ -25,7 +25,6 @@ CREATE TABLE user (
 );
 ```
 
-
 ### 2 登录令牌表 `user_token`
 
 用途：实现 Token 鉴权，支持多端登录
@@ -40,7 +39,6 @@ CREATE TABLE user_token (
     FOREIGN KEY (user_id) REFERENCES user(id)
 );
 ```
-
 
 ### 3 笔记表 `note`
 
@@ -57,11 +55,14 @@ CREATE TABLE note (
     is_deleted TINYINT DEFAULT 0,
     updated_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_public TINYINT DEFAULT 0,
+    view_count INT DEFAULT 0,
+    like_count INT DEFAULT 0,
+    collect_count INT DEFAULT 0,
     FULLTEXT KEY ft_content (title, content),
     FOREIGN KEY (user_id) REFERENCES user(id)
 );
 ```
-
 
 ### 4 笔记历史表 `note_history`
 
@@ -78,7 +79,6 @@ CREATE TABLE note_history (
 );
 ```
 
-
 ### 5 文件夹表 `note_folder`
 
 支持多级目录
@@ -94,19 +94,16 @@ CREATE TABLE note_folder (
 );
 ```
 
-
 ### 6 标签表 `tag`
 
 ```sql
 CREATE TABLE tag (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
-    name VARCHAR(50),
+    name VARCHAR(50) NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES user(id)
+    UNIQUE KEY uk_tag_name (name)
 );
 ```
-
 
 ### 7 笔记-标签关联表 `note_tag`
 
@@ -122,7 +119,6 @@ CREATE TABLE note_tag (
 );
 ```
 
-
 ### 8 附件表 `file_resource`
 
 文件路径存储，文件本体存磁盘或对象存储
@@ -130,27 +126,85 @@ CREATE TABLE note_tag (
 ```sql
 CREATE TABLE file_resource (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT NOT NULL,
+    user_id BIGINT,
     note_id BIGINT,
-    file_name VARCHAR(255) NOT NULL,
-    file_path VARCHAR(512),  -- 本地临时路径（可选）
-    file_type VARCHAR(50),   -- 文件MIME类型
-    file_size BIGINT,        -- 新增：文件大小（字节）
-    object_key VARCHAR(255) NOT NULL,  -- 新增：MinIO 唯一存储key
-    url VARCHAR(512),       -- 新增：MinIO 访问URL
-    -- 状态：processing=上传中 done=成功 failed=失败
-    status ENUM('processing', 'done', 'failed') DEFAULT 'processing',
+    file_name VARCHAR(255),
+    file_path VARCHAR(255),
+    file_type VARCHAR(50),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    file_size BIGINT,
+    object_key VARCHAR(255),
+    url VARCHAR(512),
+    status ENUM('processing', 'done', 'failed') DEFAULT 'processing',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    -- 外键
     FOREIGN KEY (user_id) REFERENCES user(id),
-    FOREIGN KEY (note_id) REFERENCES note(id),
-    
-    -- 索引（加速查询）
-    INDEX idx_user_id (user_id),
-    INDEX idx_note_id (note_id),
-    INDEX idx_status (status)
+    FOREIGN KEY (note_id) REFERENCES note(id)
+);
+```
+
+### 9 笔记收藏表 `note_collect`
+
+```sql
+CREATE TABLE note_collect (
+    user_id BIGINT NOT NULL,
+    note_id BIGINT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, note_id)
+);
+```
+
+### 10 笔记点赞表 `note_like`
+
+```sql
+CREATE TABLE note_like (
+    user_id BIGINT NOT NULL,
+    note_id BIGINT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, note_id)
+);
+```
+
+### 11 搜索历史表 `search_history`
+
+```sql
+CREATE TABLE search_history (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    query VARCHAR(255),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_user_time (user_id, created_at)
+);
+```
+
+### 12 用户行为表 `user_action`
+
+```sql
+CREATE TABLE user_action (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    note_id BIGINT NOT NULL,
+    action_type TINYINT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_user (user_id),
+    KEY idx_note (note_id),
+    KEY idx_action (action_type),
+    FOREIGN KEY (user_id) REFERENCES user(id),
+    FOREIGN KEY (note_id) REFERENCES note(id)
+);
+```
+
+### 13 用户标签统计表 `user_tag_stat`
+
+```sql
+CREATE TABLE user_tag_stat (
+    user_id BIGINT NOT NULL,
+    tag_id BIGINT NOT NULL,
+    view_count INT DEFAULT 0,
+    like_count INT DEFAULT 0,
+    collect_count INT DEFAULT 0,
+    last_action_time DATETIME,
+    PRIMARY KEY (user_id, tag_id),
+    KEY idx_user_score (user_id)
 );
 ```
 

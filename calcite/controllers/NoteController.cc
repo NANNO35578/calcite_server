@@ -154,7 +154,6 @@ void NoteController::updateNote(const HttpRequestPtr &req, std::function<void(co
                     const std::string* pSummary = summary.empty() ? nullptr : &summary;
                     const bool* pIsPublic = isPublic ? &isPublic : nullptr;
                     
-                    // TODO 标签更新后也要更新ES，目前先不处理标签更新
                     esClient_.updateDocument(noteId, pTitle, pContent, pSummary, {}, pIsPublic);
                     
                     auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "更新笔记成功"));
@@ -525,7 +524,7 @@ void NoteController::generateNoteTagsByAi(const HttpRequestPtr &req, std::functi
     noteMapper.findByPrimaryKey(
       noteId,
       [this, noteId, userId, callback, dbClient](const drogon_model::calcite::Note &note) {
-        if (note.getValueOfUserId() != userId) {
+        if (note.getValueOfUserId() != userId && note.getValueOfIsPublic() == 0) {
           auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "无权访问该笔记"));
           callback(resp);
           return;
@@ -538,7 +537,8 @@ void NoteController::generateNoteTagsByAi(const HttpRequestPtr &req, std::functi
           return;
         }
 
-        kimiService_.recommendTags(content, [this, noteId, callback, dbClient](const calcite::services::TagRecommendationResult &result) {
+        kimiService_.recommendTags(content, 
+         [this, noteId, callback, dbClient](const calcite::services::TagRecommendationResult &result) {
         // dsService_.recommendTags(content, [this, noteId, callback, dbClient](const calcite::services::TagRecommendationResult &result) {
           if (!result.success) {
             auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "AI标签生成失败: " + result.errorMessage));
@@ -547,6 +547,7 @@ void NoteController::generateNoteTagsByAi(const HttpRequestPtr &req, std::functi
           }
 
           if (result.tags.empty()) {
+            // 上一步日志已经记录了AI生成标签为空的情况，这里直接返回成功但空列表
             auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "AI标签生成成功", Json::Value(Json::arrayValue)));
             callback(resp);
             return;

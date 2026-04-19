@@ -36,10 +36,10 @@
 | /api/note/detail   | GET  | [获取笔记详情](#25-获取笔记详情-get-apinotedetail)      |
 | /api/note/search   | GET  | [全文搜索](#26-全文搜索笔记-get-apinotesearch)         |
 |                    |      |                 |
-| /api/notes/{id}/tags    | GET  | [获取笔记标签](#27-获取笔记标签列表-get-apinotesidtags)         |
-| /api/notes/{id}/tags/ai | POST | [AI生成标签](#28-ai生成笔记标签-post-apinotesidtagsai)   |
-| /api/tags/hot           | GET  | [获取热门标签](#31-获取热门标签-get-apitagshot)           |
-| /api/folder/create      | POST | [创建文件夹](#36-创建文件夹-post-apifoldercreate)           |
+| /api/notes/tags    | GET  | [获取笔记标签](#27-获取笔记标签列表-get-apinotesidtags)         |
+| /api/notes/tags/ai | POST | [AI生成标签](#28-ai生成笔记标签-post-apinotesidtagsai)   |
+| /api/tags/hot      | GET  | [获取热门标签](#31-获取热门标签-get-apitagshot)           |
+| /api/folder/create | POST | [创建文件夹](#36-创建文件夹-post-apifoldercreate)           |
 | /api/folder/list   | GET  | [获取文件夹列表](#39-获取文件夹列表-get-apifolderlist)         |
 | /api/folder/update | POST | [更新文件夹](#37-更新文件夹-post-apifolderupdate)           |
 | /api/folder/delete | POST | [删除文件夹](#38-删除文件夹-post-apifolderdelete)           |

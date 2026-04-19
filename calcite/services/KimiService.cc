@@ -113,28 +113,22 @@ TagRecommendationResult KimiService::parseResponse(const std::string& responseDa
         return result;
     }
 
-    // Check for API-level error
     if (root.isMember("error") && !root["error"].isNull()) {
         result.success = false;
-        if (root["error"].isMember("message")) {
-            result.errorMessage = root["error"]["message"].asString();
-        } else {
-            result.errorMessage = "KIMI API returned an error";
-        }
+        result.errorMessage = root["error"].isMember("message") 
+            ? root["error"]["message"].asString() 
+            : "KIMI API returned an error";
         return result;
     }
 
-    // Extract content from choices
-    if (!root.isMember("choices") || !root["choices"].isArray() ||
-        root["choices"].empty()) {
+    if (!root.isMember("choices") || !root["choices"].isArray() || root["choices"].empty()) {
         result.success = false;
         result.errorMessage = "Invalid response: no choices found";
         return result;
     }
 
     const Json::Value& firstChoice = root["choices"][0];
-    if (!firstChoice.isMember("message") ||
-        !firstChoice["message"].isMember("content")) {
+    if (!firstChoice.isMember("message") || !firstChoice["message"].isMember("content")) {
         result.success = false;
         result.errorMessage = "Invalid response: missing message content";
         return result;
@@ -142,17 +136,32 @@ TagRecommendationResult KimiService::parseResponse(const std::string& responseDa
 
     std::string content = firstChoice["message"]["content"].asString();
 
-    // Parse comma-separated tags
-    std::istringstream tagStream(content);
+    // 统一替换：中文顿号 、 → 英文逗号 ,
+    std::string cleanedContent;
+    for (size_t i = 0; i < content.size(); ++i) {
+      // 中文顿号的 UTF-8 编码是 0xE3 0x80 0x81
+      if (i + 2 < content.size() &&
+       (uint8_t)content[i] == 0xE3 &&
+       (uint8_t)content[i + 1] == 0x80 &&
+       (uint8_t)content[i + 2] == 0x81) {
+        cleanedContent += ',';
+        i += 2; // 跳过已处理的2个字节
+      } else {
+        cleanedContent += content[i];
+      }
+    }
+
+    // 按逗号分割标签（兼容中英文分隔符）
+    std::istringstream tagStream(cleanedContent);
     std::string tag;
     while (std::getline(tagStream, tag, ',')) {
-        // Trim whitespace
+        // 修剪空白字符（空格、制表符、换行、回车）
         size_t start = tag.find_first_not_of(" \t\n\r");
-        if (start == std::string::npos) {
-            continue;
-        }
+        if (start == std::string::npos) continue;
+
         size_t end = tag.find_last_not_of(" \t\n\r");
         std::string trimmed = tag.substr(start, end - start + 1);
+
         if (!trimmed.empty()) {
             result.tags.push_back(trimmed);
         }

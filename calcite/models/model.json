@@ -6,8 +6,21 @@
     "user": "root",
     "password": "mysql0",
     "client_encoding": "utf8mb4",
-    // "tables": ["user","note","note_folder","tag","note_tag","file_resource"],
-    "tables": ["note"],
+    // "tables": ["user"],
+    // "tables": ["note"],
+    // "tables": ["note_folder"],
+    // "tables": ["tag"],
+    // "tables": ["note_tag"],
+    // "tables": ["file_resource"],
+    // "tables": ["note_collect"],
+    // "tables": ["note_like"],
+    // "tables": ["user_action"],
+    // "tables": ["user_tag_stat"],
+    // "tables": ["user_token"],
+    // not used
+    // "tables": ["search_history"],
+    // "tables": ["note_history"],
+
     "convert": {
       "enabled": false
     },

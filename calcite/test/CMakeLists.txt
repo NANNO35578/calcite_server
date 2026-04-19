@@ -1,22 +1,40 @@
 cmake_minimum_required(VERSION 3.5)
 project(calcite_test CXX)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Clear any inherited variables from parent scope
+unset(CTL_SRC)
+unset(FILTER_SRC)
+unset(PLUGIN_SRC)
+unset(MODEL_SRC)
+unset(SERVICE_SRC)
+unset(UTIL_SRC)
 
+# Collect source files from parent directories
+aux_source_directory(../controllers CTL_SRC)
+aux_source_directory(../filters FILTER_SRC)
+aux_source_directory(../plugins PLUGIN_SRC)
+aux_source_directory(../models MODEL_SRC)
+aux_source_directory(../services SERVICE_SRC)
+aux_source_directory(../utils UTIL_SRC)
+
+# Add test executable
 add_executable(${PROJECT_NAME}
- test_main.cc
-)
+               test_main.cc
+               ${CTL_SRC}
+               ${FILTER_SRC}
+               ${PLUGIN_SRC}
+               ${MODEL_SRC}
+               ${SERVICE_SRC}
+               ${UTIL_SRC})
 
-# ##############################################################################
-# If you include the drogon source code locally in your project, use this method
-# to add drogon 
-# target_link_libraries(${PROJECT_NAME} PRIVATE drogon)
-#
-# and comment out the following lines
-target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon)
+# Link libraries (already found by parent CMakeLists.txt)
+target_link_libraries(${PROJECT_NAME}
+                      PRIVATE Drogon::Drogon
+                              CURL::libcurl
+                              OpenSSL::SSL
+                              OpenSSL::Crypto)
 
-ParseAndAddDrogonTests(${PROJECT_NAME})
-
-aux_source_directory(utils UTIL_SRC)
-target_sources(${PROJECT_NAME} PRIVATE ${UTIL_SRC})
+# Include directories
+target_include_directories(${PROJECT_NAME}
+                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..
+                                   ${CMAKE_CURRENT_SOURCE_DIR}/../models)

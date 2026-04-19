@@ -61,16 +61,16 @@ std::string EsClient::buildDocumentJson(int64_t userId,
     oss << "\"title\":\"" << escapeJson(title) << "\",";
     oss << "\"content\":\"" << escapeJson(content) << "\",";
     oss << "\"summary\":\"" << escapeJson(summary) << "\",";
+    
     oss << "\"tags\":[";
-    if (tags.empty()) {
-      oss << "],";
-    } else {
+    if (!tags.empty()) {
       for (size_t i = 0; i < tags.size(); ++i) {
         if (i > 0) oss << ",";
         oss << "\"" << escapeJson(&(tags[i])) << "\"";
       }
     }
     oss << "],";
+
     oss << "\"is_public\":" << (isPublic ? "true" : "false") << ",";
     oss << "\"created_at\":\"" << nowFormat << "\",";
     oss << "\"updated_at\":\"" << nowFormat << "\"";
@@ -98,6 +98,7 @@ void EsClient::indexDocument(int64_t noteId,
             LOG_ERROR << "ES index failed for note_id=" << noteId << ", result=" << static_cast<int>(result);
         } else if (resp && resp->getStatusCode() != 200 && resp->getStatusCode() != 201) {
             LOG_ERROR << "ES index failed for note_id=" << noteId << ", status=" << resp->getStatusCode();
+            std::cout<<resp->getBody()<<std::endl;
         } else {
             LOG_DEBUG << "ES index success for note_id=" << noteId;
         }
