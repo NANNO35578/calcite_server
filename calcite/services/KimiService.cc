@@ -52,11 +52,11 @@ KimiService::~KimiService() = default;
 
 std::string KimiService::buildPrompt(const std::string& noteContent) {
     std::ostringstream oss;
-    oss << "任务：为笔记从标签库中推选** exactly 5 个**标签。\n"
+    oss << "任务：为笔记从标签库中推选** exactly up to 5 **标签。\n"
         << "要求：\n"
         << "- 必须从下方标签列表中选择，禁止自创\n"
         << "- 优先匹配：技术方向、知识点、用途、场景\n"
-        << "- 结果只输出最多 5 个标签，逗号分隔，无其他文字.\n"
+        << "- 结果只输出**最多** 5 个标签，逗号分隔，无其他文字.\n"
         << "- 如果无法从标签库中找到合适的标签，请选择最相关的5个，或者如果完全不相关，请返回`,,,`。\n"
         << "\n"
         << "笔记内容：\n"

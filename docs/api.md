@@ -38,6 +38,11 @@
 |                    |      |                 |
 | /api/notes/tags    | GET  | [获取笔记标签](#27-获取笔记标签列表-get-apinotesidtags)         |
 | /api/notes/tags/ai | POST | [AI生成标签](#28-ai生成笔记标签-post-apinotesidtagsai)   |
+| /api/note/view     | POST | [浏览笔记](#29-浏览笔记-post-apinoteview)                 |
+| /api/note/like     | POST | [点赞笔记](#210-点赞笔记-post-apinotelike)                |
+| /api/note/collect  | POST | [收藏笔记](#211-收藏笔记-post-apinotecollect)             |
+| /api/notes/like    | DELETE | [取消点赞](#212-取消点赞-delete-apinoteslike)           |
+| /api/notes/collect | DELETE | [取消收藏](#213-取消收藏-delete-apinotescollect)        |
 | /api/tags/hot      | GET  | [获取热门标签](#31-获取热门标签-get-apitagshot)           |
 | /api/folder/create | POST | [创建文件夹](#36-创建文件夹-post-apifoldercreate)           |
 | /api/folder/list   | GET  | [获取文件夹列表](#39-获取文件夹列表-get-apifolderlist)         |
@@ -178,6 +183,11 @@ Header: `Authorization: Bearer {token}`
 | /api/note/search          | GET    | 全文搜索     |
 | /api/notes/{id}/tags      | GET    | 获取笔记标签 |
 | /api/notes/{id}/tags/ai   | POST   | AI生成标签   |
+| /api/note/view            | POST   | 浏览笔记     |
+| /api/note/like            | POST   | 点赞笔记     |
+| /api/note/collect         | POST   | 收藏笔记     |
+| /api/notes/like           | DELETE | 取消点赞     |
+| /api/notes/collect        | DELETE | 取消收藏     |
 
 **鉴权要求：** 所有笔记接口均需通过 Token 鉴权
 
@@ -437,6 +447,186 @@ Header: `Authorization: Bearer {token}`
 ```
 
 > 注：该接口会调用 DsService（DeepSeek API）根据笔记内容推荐标签，自动替换该笔记原有标签，并同步更新 Elasticsearch。
+
+### 2.9 浏览笔记 POST /api/note/view
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求示例：**
+```json
+{
+  "note_id": 1
+}
+```
+
+**请求参数：**
+| 参数    | 类型  | 必填 | 说明   |
+| ------- | ----- | ---- | ------ |
+| note_id | int64 | 是   | 笔记ID |
+
+**响应示例：**
+```json
+{
+  "code": 0,
+  "message": "浏览笔记成功",
+  "data": {}
+}
+```
+
+**说明：**
+- 记录用户浏览行为到 `user_action` 表
+- 笔记 `view_count` +1
+- 更新 `user_tag_stat` 中对应标签的浏览统计
+
+### 2.10 点赞笔记 POST /api/note/like
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求示例：**
+```json
+{
+  "note_id": 1
+}
+```
+
+**请求参数：**
+| 参数    | 类型  | 必填 | 说明   |
+| ------- | ----- | ---- | ------ |
+| note_id | int64 | 是   | 笔记ID |
+
+**响应示例（成功）：**
+```json
+{
+  "code": 0,
+  "message": "点赞笔记成功",
+  "data": {}
+}
+```
+
+**响应示例（已点赞）：**
+```json
+{
+  "code": 1,
+  "message": "已点赞过该笔记"
+}
+```
+
+**说明：**
+- 写入 `note_like` 表，重复点赞会返回错误
+- 记录用户点赞行为到 `user_action` 表
+- 笔记 `like_count` +1
+- 更新 `user_tag_stat` 中对应标签的点赞统计
+
+### 2.11 收藏笔记 POST /api/note/collect
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求示例：**
+```json
+{
+  "note_id": 1
+}
+```
+
+**请求参数：**
+| 参数    | 类型  | 必填 | 说明   |
+| ------- | ----- | ---- | ------ |
+| note_id | int64 | 是   | 笔记ID |
+
+**响应示例（成功）：**
+```json
+{
+  "code": 0,
+  "message": "收藏笔记成功",
+  "data": {}
+}
+```
+
+**响应示例（已收藏）：**
+```json
+{
+  "code": 1,
+  "message": "已收藏过该笔记"
+}
+```
+
+**说明：**
+- 写入 `note_collect` 表，重复收藏会返回错误
+- 记录用户收藏行为到 `user_action` 表
+- 笔记 `collect_count` +1
+- 更新 `user_tag_stat` 中对应标签的收藏统计
+- 收藏行为在推荐算法中权重最高
+
+### 2.12 取消点赞 DELETE /api/notes/like
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求参数：**
+| 参数    | 类型  | 必填 | 说明   |
+| ------- | ----- | ---- | ------ |
+| note_id | int64 | 是   | 笔记ID |
+
+> 参数可通过 Query String (`?note_id=1`) 或 JSON Body 传递
+
+**响应示例（成功）：**
+```json
+{
+  "code": 0,
+  "message": "取消点赞成功",
+  "data": {}
+}
+```
+
+**响应示例（未点赞）：**
+```json
+{
+  "code": 1,
+  "message": "未点赞过该笔记"
+}
+```
+
+**说明：**
+- 删除 `note_like` 表中对应记录
+- 笔记 `like_count` -1（最小为0）
+- 更新 `user_tag_stat` 中对应标签的点赞统计
+
+### 2.13 取消收藏 DELETE /api/notes/collect
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求参数：**
+| 参数    | 类型  | 必填 | 说明   |
+| ------- | ----- | ---- | ------ |
+| note_id | int64 | 是   | 笔记ID |
+
+> 参数可通过 Query String (`?note_id=1`) 或 JSON Body 传递
+
+**响应示例（成功）：**
+```json
+{
+  "code": 0,
+  "message": "取消收藏成功",
+  "data": {}
+}
+```
+
+**响应示例（未收藏）：**
+```json
+{
+  "code": 1,
+  "message": "未收藏过该笔记"
+}
+```
+
+**说明：**
+- 删除 `note_collect` 表中对应记录
+- 笔记 `collect_count` -1（最小为0）
+- 更新 `user_tag_stat` 中对应标签的收藏统计
 
 ---
 

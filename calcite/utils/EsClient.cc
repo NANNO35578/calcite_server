@@ -189,7 +189,7 @@ void EsClient::deleteDocument(int64_t noteId) {
 void EsClient::search(int64_t userId,
                       bool isPublic,
                       const std::string& keyword,
-                      std::function<void(const std::vector<EsSearchResult>&)> callback,
+                      std::function<void(const std::vector<EsSearchResult>&, const std::map<std::string, int>&)> callback,
                       int from,
                       int size) {
     auto req = HttpRequest::newHttpRequest();
@@ -221,7 +221,7 @@ void EsClient::search(int64_t userId,
     std::string body = R"({
         "from": )" + std::to_string(from) + R"(,
         "size": )" + std::to_string(size) + R"(,
-        "_source": ["title", "summary", "created_at", "updated_at"],  // 新增
+        "_source": ["title", "summary", "created_at", "updated_at", "tags"],
         "query": {
             "bool": {
                 "must": [
@@ -255,28 +255,29 @@ void EsClient::search(int64_t userId,
 
     req->setBody(body);
 
+    // std::cout << "ES search request body: " << body << std::endl;
+
     client_->sendRequest(req, [this, callback](ReqResult result, const HttpResponsePtr& resp) {
         if (result != ReqResult::Ok || !resp) {
             LOG_ERROR << "ES search failed, result=" << static_cast<int>(result);
-            callback({});
+            callback({}, {});
             return;
         }
 
         if (resp->getStatusCode() != 200) {
             LOG_ERROR << "ES search failed, status=" << resp->getStatusCode() 
                       << ", body=" << std::string(resp->getBody());
-            callback({});
+            callback({}, {});
             return;
         }
 
-        std::string responseBody = std::string(resp->getBody());
-        auto results = parseSearchResult(responseBody);
-        callback(results);
+        parseResultCallback(std::string(resp->getBody()), callback);
     });
 }
 
 std::vector<EsSearchResult> EsClient::parseSearchResult(const std::string& jsonResponse) {
     std::vector<EsSearchResult> results;
+    std::map<std::string, int> tagHitCounts; // 用于统计标签命中次数
     
     Json::Value root;
     Json::CharReaderBuilder builder;
@@ -322,6 +323,13 @@ std::vector<EsSearchResult> EsClient::parseSearchResult(const std::string& jsonR
             if (source.isMember("updated_at")) {
                 result.updatedAt = source["updated_at"].asString();
             }
+            if(source.isMember("tags") && source["tags"].isArray()) {
+                for (const auto& tag : source["tags"]) {
+                    if (tag.isString()) {
+                        tagHitCounts[tag.asString()] += 1; // 统计标签命中次数
+                    }
+                }
+            }
         }
         // ====================================================================
 
@@ -348,11 +356,97 @@ std::vector<EsSearchResult> EsClient::parseSearchResult(const std::string& jsonR
                 result.highlightContent = highlight["summary"][0].asString();
             }
         }
-
         results.push_back(result);
     }
 
     return results;
+}
+
+void EsClient::parseResultCallback(const std::string &jsonResponse, std::function<void(const std::vector<EsSearchResult> &, std::map<std::string, int> &)> callback) {
+    std::vector<EsSearchResult> results;
+    std::map<std::string, int> tagHitCounts; // 用于统计标签命中次数
+    
+    Json::Value root;
+    Json::CharReaderBuilder builder;
+    std::string errors;
+    
+    std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+    if (!reader->parse(jsonResponse.c_str(), jsonResponse.c_str() + jsonResponse.size(), &root, &errors)) {
+        LOG_ERROR << "Failed to parse ES response: " << errors;
+        callback(results, tagHitCounts);
+    }
+
+    if (!root.isMember("hits") || !root["hits"].isMember("hits")) {
+        callback(results, tagHitCounts);
+    }
+
+    const Json::Value& hits = root["hits"]["hits"];
+    for (const auto& hit : hits) {
+        EsSearchResult result;
+        
+        // 获取ID
+        if (hit.isMember("_id")) {
+            result.noteId = std::stoll(hit["_id"].asString());
+        }
+        
+        // 获取分数
+        if (hit.isMember("_score")) {
+            result.score = static_cast<float>(hit["_score"].asDouble());
+        }
+
+        // ===================== 新增：从 _source 提取字段 =====================
+        if (hit.isMember("_source")) {
+            const Json::Value& source = hit["_source"];
+            
+            if (source.isMember("title")) {
+                result.title = source["title"].asString();
+            }
+            if (source.isMember("summary")) {
+                result.summary = source["summary"].asString();
+            }
+            if (source.isMember("created_at")) {
+                result.createdAt = source["created_at"].asString();
+            }
+            if (source.isMember("updated_at")) {
+                result.updatedAt = source["updated_at"].asString();
+            }
+            if(source.isMember("tags") && source["tags"].isArray()) {
+                for (const auto& tag : source["tags"]) {
+                    if (tag.isString()) {
+                        tagHitCounts[tag.asString()] += 1; // 统计标签命中次数
+                    }
+                }
+            }
+        }
+        // ====================================================================
+
+        // 获取高亮内容
+        if (hit.isMember("highlight")) {
+            const Json::Value& highlight = hit["highlight"];
+            
+            if (highlight.isMember("title") && highlight["title"].isArray() && highlight["title"].size() > 0) {
+                result.highlightTitle = highlight["title"][0].asString();
+            }
+            
+            if (highlight.isMember("content") && highlight["content"].isArray()) {
+                std::ostringstream oss;
+                for (const auto& frag : highlight["content"]) {
+                    if (!oss.str().empty()) oss << " ... ";
+                    oss << frag.asString();
+                }
+                result.highlightContent = oss.str();
+            }
+            
+            // 如果没有content高亮，尝试使用summary
+            if (result.highlightContent.empty() && 
+                highlight.isMember("summary") && highlight["summary"].isArray() && highlight["summary"].size() > 0) {
+                result.highlightContent = highlight["summary"][0].asString();
+            }
+        }
+        results.push_back(result);
+    }
+
+    callback(results, tagHitCounts);
 }
 
 std::vector<EsSearchResult> EsClient::searchSync(int64_t userId,
@@ -364,7 +458,7 @@ std::vector<EsSearchResult> EsClient::searchSync(int64_t userId,
     std::promise<std::vector<EsSearchResult>> promise;
     auto future = promise.get_future();
 
-    search(userId, isPublic, keyword, [&promise](const std::vector<EsSearchResult>& results) {
+    search(userId, isPublic, keyword, [&promise](const std::vector<EsSearchResult>& results, const std::map<std::string, int>& tagHitCounts) {
         promise.set_value(results);
     }, from, size);
 

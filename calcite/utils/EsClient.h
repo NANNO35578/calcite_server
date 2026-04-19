@@ -88,7 +88,7 @@ public:
     void search(int64_t userId,
                 bool isPublic,
                 const std::string& keyword,
-                std::function<void(const std::vector<EsSearchResult>&)> callback,
+                std::function<void(const std::vector<EsSearchResult>&, const std::map<std::string, int>&)> callback,
                 int from = 0,
                 int size = 20);
 
@@ -139,6 +139,8 @@ private:
      * 解析搜索结果
      */
     std::vector<EsSearchResult> parseSearchResult(const std::string& jsonResponse);
+
+    void parseResultCallback(const std::string& jsonResponse, std::function<void(const std::vector<EsSearchResult>&, std::map<std::string, int>&)> callback);
 
     /**
      * 转义JSON字符串
