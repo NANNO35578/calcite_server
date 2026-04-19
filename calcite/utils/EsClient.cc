@@ -469,6 +469,164 @@ std::vector<EsSearchResult> EsClient::searchSync(int64_t userId,
     return future.get();
 }
 
+std::vector<EsSearchResult> EsClient::searchByTagsSync(const std::vector<std::string>& tags,
+                                                       int from,
+                                                       int size,
+                                                       int timeoutMs) {
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(Post);
+    req->setPath("/" + indexName_ + "/_search");
+    req->setContentTypeCode(CT_APPLICATION_JSON);
+
+    std::ostringstream oss;
+    if (!tags.empty()) {
+        oss << "\"tags\":[";
+        for (size_t i = 0; i < tags.size(); ++i) {
+            if (i > 0) oss << ",";
+            oss << "\"" << escapeJson(&(tags[i])) << "\"";
+        }
+        oss << "]";
+        std::string tagsJson = oss.str();
+        oss.str("");
+        oss << R"({
+            "from": )" << from << R"(,
+            "size": )" << size << R"(,
+            "_source": ["title", "summary", "created_at", "updated_at", "tags"],
+            "query": {
+                "bool": {
+                    "must": [
+                        { "terms": { )" << tagsJson << R"( } }
+                    ],
+                    "filter": [
+                        { "term": { "is_public": true } }
+                    ]
+                }
+            },
+            "sort": [
+                {"created_at": {"order": "desc"}}
+            ]
+        })";
+    } else {
+        oss << R"({
+            "from": )" << from << R"(,
+            "size": )" << size << R"(,
+            "_source": ["title", "summary", "created_at", "updated_at", "tags"],
+            "query": {
+                "bool": {
+                    "filter": [
+                        { "term": { "is_public": true } }
+                    ]
+                }
+            },
+            "sort": [
+                {"created_at": {"order": "desc"}}
+            ]
+        })";
+    }
+
+    req->setBody(oss.str());
+
+    std::promise<std::vector<EsSearchResult>> promise;
+    auto future = promise.get_future();
+
+    client_->sendRequest(req, [this, &promise](ReqResult result, const HttpResponsePtr& resp) {
+        if (result != ReqResult::Ok || !resp) {
+            LOG_ERROR << "ES searchByTags failed, result=" << static_cast<int>(result);
+            promise.set_value({});
+            return;
+        }
+
+        if (resp->getStatusCode() != 200) {
+            LOG_ERROR << "ES searchByTags failed, status=" << resp->getStatusCode()
+                      << ", body=" << std::string(resp->getBody());
+            promise.set_value({});
+            return;
+        }
+
+        promise.set_value(parseSearchResult(std::string(resp->getBody())));
+    });
+
+    if (future.wait_for(std::chrono::milliseconds(timeoutMs)) == std::future_status::timeout) {
+        LOG_ERROR << "ES searchByTags timeout";
+        return {};
+    }
+    return future.get();
+}
+
+std::vector<std::string> EsClient::getHotTagsSync(int topN, int timeoutMs) {
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(Post);
+    req->setPath("/" + indexName_ + "/_search");
+    req->setContentTypeCode(CT_APPLICATION_JSON);
+
+    std::string body = R"({
+        "size": 0,
+        "query": {
+            "bool": {
+                "filter": [
+                    { "term": { "is_public": true } },
+                    { "range": { "created_at": { "gte": "now-7d/d" } } }
+                ]
+            }
+        },
+        "aggs": {
+            "hot_tags": {
+                "terms": {
+                    "field": "tags",
+                    "size": )" + std::to_string(topN) + R"(
+                }
+            }
+        }
+    })";
+
+    req->setBody(body);
+
+    std::promise<std::vector<std::string>> promise;
+    auto future = promise.get_future();
+
+    client_->sendRequest(req, [&promise](ReqResult result, const HttpResponsePtr& resp) {
+        if (result != ReqResult::Ok || !resp) {
+            LOG_ERROR << "ES getHotTags failed, result=" << static_cast<int>(result);
+            promise.set_value({});
+            return;
+        }
+
+        if (resp->getStatusCode() != 200) {
+            LOG_ERROR << "ES getHotTags failed, status=" << resp->getStatusCode();
+            promise.set_value({});
+            return;
+        }
+
+        std::vector<std::string> tags;
+        std::string responseBody = std::string(resp->getBody());
+        Json::Value root;
+        Json::CharReaderBuilder builder;
+        std::string errors;
+        std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+        if (reader->parse(responseBody.c_str(), responseBody.c_str() + responseBody.size(), &root, &errors)) {
+            if (root.isMember("aggregations") && root["aggregations"].isMember("hot_tags") &&
+                root["aggregations"]["hot_tags"].isMember("buckets")) {
+                const Json::Value& buckets = root["aggregations"]["hot_tags"]["buckets"];
+                for (const auto& bucket : buckets) {
+                    if (bucket.isMember("key")) {
+                        tags.push_back(bucket["key"].asString());
+                    }
+                }
+            }
+        } else {
+            LOG_ERROR << "Failed to parse ES hot tags response: " << errors;
+        }
+
+        promise.set_value(tags);
+    });
+
+    if (future.wait_for(std::chrono::milliseconds(timeoutMs)) == std::future_status::timeout) {
+        LOG_ERROR << "ES getHotTags timeout";
+        return {};
+    }
+    return future.get();
+}
+
 bool EsClient::ping(int timeoutMs) {
     auto req = HttpRequest::newHttpRequest();
     req->setMethod(Get);

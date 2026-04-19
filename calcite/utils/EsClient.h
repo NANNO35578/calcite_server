@@ -110,6 +110,27 @@ public:
                                            int timeoutMs = 5000);
 
     /**
+     * 按标签搜索公开笔记（同步）
+     * @param tags 标签列表（空则查询所有公开笔记）
+     * @param from 分页起始位置
+     * @param size 每页大小
+     * @param timeoutMs 超时时间（毫秒）
+     * @return 搜索结果列表
+     */
+    std::vector<EsSearchResult> searchByTagsSync(const std::vector<std::string>& tags,
+                                                  int from = 0,
+                                                  int size = 20,
+                                                  int timeoutMs = 5000);
+
+    /**
+     * 获取热门标签（同步）
+     * @param topN TopN 数量
+     * @param timeoutMs 超时时间（毫秒）
+     * @return 热门标签列表
+     */
+    std::vector<std::string> getHotTagsSync(int topN = 10, int timeoutMs = 5000);
+
+    /**
      * 检查ES是否可用
      * @return 是否可用
      */

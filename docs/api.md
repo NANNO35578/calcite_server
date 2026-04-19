@@ -43,6 +43,7 @@
 | /api/note/collect  | POST | [收藏笔记](#211-收藏笔记-post-apinotecollect)             |
 | /api/notes/like    | DELETE | [取消点赞](#212-取消点赞-delete-apinoteslike)           |
 | /api/notes/collect | DELETE | [取消收藏](#213-取消收藏-delete-apinotescollect)        |
+| /api/recommend/notes | GET  | [推荐笔记](#214-推荐笔记-get-apirecommendnotes)         |
 | /api/tags/hot      | GET  | [获取热门标签](#31-获取热门标签-get-apitagshot)           |
 | /api/folder/create | POST | [创建文件夹](#36-创建文件夹-post-apifoldercreate)           |
 | /api/folder/list   | GET  | [获取文件夹列表](#39-获取文件夹列表-get-apifolderlist)         |
@@ -627,6 +628,44 @@ Header: `Authorization: Bearer {token}`
 - 删除 `note_collect` 表中对应记录
 - 笔记 `collect_count` -1（最小为0）
 - 更新 `user_tag_stat` 中对应标签的收藏统计
+
+### 2.14 推荐笔记 GET /api/recommend/notes
+
+**请求方式：**
+Header: `Authorization: Bearer {token}`
+
+**请求参数：**
+| 参数       | 类型  | 必填 | 说明                                |
+| ---------- | ----- | ---- | ----------------------------------- |
+| page       | int   | 否   | 页码，默认1                         |
+| page_size  | int   | 否   | 每页数量，默认10，最大50            |
+
+**响应示例：**
+```json
+{
+  "code": 0,
+  "message": "获取推荐成功",
+  "data": [
+    {
+      "id": 1,
+      "title": "推荐笔记标题",
+      "summary": "笔记摘要",
+      "created_at": "2025-01-01T12:00:00",
+      "updated_at": "2025-01-01T12:00:00"
+    }
+  ]
+}
+```
+
+**说明：**
+- 基于用户画像的个性化推荐，返回公开笔记列表
+- **新用户**（最近30天行为数 < 20）：冷启动推荐
+  - 综合用户笔记标签（Top3）、最新标签（Top2）、搜索历史（Top2）、全局热门标签（Top3）
+- **老用户**（最近30天行为数 ≥ 20）：兴趣模型推荐
+  - 基于 `user_tag_stat` 行为分数：`(1×view + 3×like + 7×collect) × e^(-0.1×Δt)`
+  - 综合行为标签（Top5）、搜索历史（Top2）、全局热门标签（Top3）
+- 兜底逻辑：当标签集合为空或ES无匹配结果时，返回最近创建的公开笔记
+- 分页参数：`from = (page-1) * page_size`，`size = page_size`
 
 ---
 
