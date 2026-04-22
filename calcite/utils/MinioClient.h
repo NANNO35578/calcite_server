@@ -18,8 +18,8 @@ namespace utils {
  */
 struct MinioConfig {
     std::string endpoint = "http://127.0.0.1:9000";
-    std::string accessKey = "admin";
-    std::string secretKey = "12345678";
+    std::string accessKey;
+    std::string secretKey;
     std::string bucket = "notes-files";
     std::string region = "us-east-1";  // Default S3 region
 };

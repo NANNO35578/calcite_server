@@ -76,10 +76,11 @@ public:
 private:
     // OCR API configuration
     static constexpr const char* API_URL = "https://jf3187r8t1fdu6r1.aistudio-app.com/layout-parsing";
-    static constexpr const char* API_TOKEN = "3ba24aebe8939b41b442baafcd198c3bf40975b5";
-    
+
     // Timeout for OCR API call (in seconds)
     static constexpr int API_TIMEOUT = 300;
+
+    std::string apiToken_;
 
     /**
      * Encode file data to base64

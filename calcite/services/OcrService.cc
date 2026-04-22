@@ -7,6 +7,9 @@
 #include <drogon/drogon.h>
 #include <curl/curl.h>
 #include <json/json.h>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
 
 namespace calcite {
 namespace services {
@@ -28,7 +31,14 @@ static size_t writeCallback(void* contents, size_t size, size_t nmemb, void* use
     return totalSize;
 }
 
-OcrService::OcrService() = default;
+OcrService::OcrService() {
+    const char* envToken = std::getenv("CALCITE_OCR_API_TOKEN");
+    if (envToken && std::strlen(envToken) > 0) {
+        apiToken_ = envToken;
+    } else {
+        std::cerr << "[Security Warning] CALCITE_OCR_API_TOKEN not set. OCR service will fail." << std::endl;
+    }
+}
 OcrService::~OcrService() = default;
 
 std::string OcrService::base64Encode(const std::vector<uint8_t>& data) {
@@ -153,7 +163,8 @@ void OcrService::performOcrRequest(
 ) {
     // Run in background thread
     drogon::app().getLoop()->queueInLoop([this, requestJson, callback]() {
-        std::thread([requestJson, callback]() {
+        std::string apiToken = apiToken_;
+        std::thread([requestJson, callback, apiToken]() {
             CURL* curl = curl_easy_init();
             if (!curl) {
                 OcrResult result;
@@ -163,9 +174,18 @@ void OcrService::performOcrRequest(
                 return;
             }
             
+            if (apiToken.empty()) {
+                OcrResult result;
+                result.success = false;
+                result.errorMessage = "OCR API token not configured";
+                drogon::app().getLoop()->queueInLoop([callback, result]() { callback(result); });
+                curl_easy_cleanup(curl);
+                return;
+            }
+
             // Build authorization header
             std::string authHeader = "Authorization: token ";
-            authHeader += API_TOKEN;
+            authHeader += apiToken;
             
             CurlResponse response;
             

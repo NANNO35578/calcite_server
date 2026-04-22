@@ -6,11 +6,23 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
 
 namespace calcite {
 namespace utils {
 
-const std::string JwtUtil::SECRET_KEY = "calcite_secret_key_2024";
+static std::string getJwtSecretFromEnv() {
+    const char* envSecret = std::getenv("CALCITE_JWT_SECRET");
+    if (envSecret && std::strlen(envSecret) > 0) {
+        return std::string(envSecret);
+    }
+    std::cerr << "[Security Warning] CALCITE_JWT_SECRET not set. JWT tokens are insecure!" << std::endl;
+    return "";
+}
+
+const std::string JwtUtil::SECRET_KEY = getJwtSecretFromEnv();
 
 // 简单的 Base64 编码（简化实现）
 static const char base64_chars[] = 

@@ -7,8 +7,9 @@
 - 框架：Drogon C++ Web框架
 - 数据库：MariaDB
 - 文件存储：MinIO
-- 全文搜索：Elasticsearch
-- OCR：PaddleOCR 在线识别（消耗API Token）
+- 全文搜索：Elasticsearch + IK 中文分词
+- AI 标签推荐：Moonshot (Kimi) API
+- OCR：在线 OCR API（图片/PDF 转文本）
 - 接口：RESTful API
 
 ## API 列表
@@ -28,16 +29,20 @@
 | /api/note/list     | GET  | 获取笔记列表      |
 | /api/note/detail   | GET  | 获取笔记详情      |
 | /api/note/search   | GET  | 全文搜索         |
+| /api/notes/tags    | GET | 获取笔记标签      |
+| /api/notes/tags/ai | POST | AI生成标签   |
+| /api/note/view     | POST | 浏览笔记         |
+| /api/note/like     | POST | 点赞笔记         |
+| /api/note/collect  | POST | 收藏笔记         |
+| /api/notes/like    | DELETE | 取消点赞       |
+| /api/notes/collect | DELETE | 取消收藏       |
+| /api/recommend/notes | GET | 推荐笔记        |
 |                    |      |                 |
-| /api/tag/create    | POST | 创建标签           |
-| /api/tag/list      | GET  | 获取标签列表         |
-| /api/tag/bind      | POST | 绑定/解除笔记标签   |
-| /api/tag/update    | POST | 更新标签           |
-| /api/tag/delete    | POST | 删除标签           |
-| /api/folder/create | POST | 创建文件夹           |
-| /api/folder/list   | GET  | 获取文件夹列表         |
-| /api/folder/update | POST | 更新文件夹           |
-| /api/folder/delete | POST | 删除文件夹           |
+| /api/tags/hot      | GET  | 获取热门标签      |
+| /api/folder/create | POST | 创建文件夹         |
+| /api/folder/list   | GET  | 获取文件夹列表       |
+| /api/folder/update | POST | 更新文件夹         |
+| /api/folder/delete | POST | 删除文件夹         |
 |                    |      |                 |
 | /api/file/upload   | POST | 上传文件到 MinIO        |
 | /api/file/list     | GET  | 获取文件列表             |
@@ -63,11 +68,13 @@
 │   │   ├── NoteFolderController
 │   │   ├── NoteTagController
 │   │   ├── OcrController
+│   │   ├── RecommendController
 │   │   ├── TagController
 │   │   └── UserController
 │   ├── models/             # 数据库ORM模型
 │   ├── services/           # 业务逻辑层
 │   │   ├── AuthService
+│   │   ├── KimiService
 │   │   ├── NoteFolderService
 │   │   └── OcrService
 │   ├── utils/              # 工具类
@@ -98,4 +105,3 @@ make
 ## 许可证
 [GPL-3.0](./LICENSE)
 > Actually, you can do whatever you want. Just leave a link redirecting to here🫠
-

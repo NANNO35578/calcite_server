@@ -23,19 +23,19 @@ namespace v1 {
 class NoteController : public drogon::HttpController<NoteController> {
 public:
   METHOD_LIST_BEGIN
-  ADD_METHOD_TO(NoteController::createNote, "/api/note/create", Post);
-  ADD_METHOD_TO(NoteController::updateNote, "/api/note/update", Post);
-  ADD_METHOD_TO(NoteController::deleteNote, "/api/note/delete", Post);
-  ADD_METHOD_TO(NoteController::listNotes, "/api/note/list", Get);
-  ADD_METHOD_TO(NoteController::getNoteDetail, "/api/note/detail", Get);
-  ADD_METHOD_TO(NoteController::searchNotes, "/api/note/search", Get);
-  ADD_METHOD_TO(NoteController::getNoteTagsHandler, "/api/notes/tags", Get);
+  ADD_METHOD_TO(NoteController::createNote,           "/api/note/create",   Post);
+  ADD_METHOD_TO(NoteController::updateNote,           "/api/note/update",   Post);
+  ADD_METHOD_TO(NoteController::deleteNote,           "/api/note/delete",   Post);
+  ADD_METHOD_TO(NoteController::listNotes,            "/api/note/list",     Get);
+  ADD_METHOD_TO(NoteController::getNoteDetail,        "/api/note/detail",   Get);
+  ADD_METHOD_TO(NoteController::searchNotes,          "/api/note/search",   Get);
+  ADD_METHOD_TO(NoteController::getNoteTagsHandler,   "/api/notes/tags",    Get);
   ADD_METHOD_TO(NoteController::generateNoteTagsByAi, "/api/notes/tags/ai", Post);
-  ADD_METHOD_TO(NoteController::viewNote, "/api/note/view", Post);
-  ADD_METHOD_TO(NoteController::likeNote, "/api/note/like", Post);
-  ADD_METHOD_TO(NoteController::collectNote, "/api/note/collect", Post);
-  ADD_METHOD_TO(NoteController::unlikeNote, "/api/notes/like", Delete);
-  ADD_METHOD_TO(NoteController::uncollectNote, "/api/notes/collect", Delete);
+  ADD_METHOD_TO(NoteController::viewNote,             "/api/note/view",     Post);
+  ADD_METHOD_TO(NoteController::likeNote,             "/api/note/like",     Post);
+  ADD_METHOD_TO(NoteController::collectNote,          "/api/note/collect",  Post);
+  ADD_METHOD_TO(NoteController::unlikeNote,           "/api/notes/like",    Delete);
+  ADD_METHOD_TO(NoteController::uncollectNote,        "/api/notes/collect", Delete);
   METHOD_LIST_END
 
   void createNote(const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&callback);

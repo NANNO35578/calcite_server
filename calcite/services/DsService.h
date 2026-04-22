@@ -49,7 +49,7 @@
 //     static constexpr const char* API_PATH = "/chat/completions";
 //     static constexpr const char* API_MODEL = "deepseek-reasoner";
 //     static constexpr int API_TIMEOUT = 60; // seconds
-//     static constexpr const char* API_TOKEN = "sk-148c2807a0ec4bec9ac4ccbaaf73b8f6";
+//     static constexpr const char* API_TOKEN = ""; // 已从环境变量读取，不再硬编码
 
 //     drogon::HttpClientPtr client_;
 

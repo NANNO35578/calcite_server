@@ -9,6 +9,8 @@
 #include <json/json.h>
 #include <sstream>
 #include <cstdlib>
+#include <cstring>
+#include <iostream>
 
 namespace calcite {
 namespace services {
@@ -46,7 +48,14 @@ Hadoop、HDFS、YARN、Hive、Spark、Flink、Kafka、Pulsar、HBase、Presto、
 )";
 
 KimiService::KimiService()
-    : client_(drogon::HttpClient::newHttpClient(API_HOST)) {}
+    : client_(drogon::HttpClient::newHttpClient(API_HOST)) {
+    const char* envToken = std::getenv("CALCITE_KIMI_API_TOKEN");
+    if (envToken && std::strlen(envToken) > 0) {
+        apiToken_ = envToken;
+    } else {
+        std::cerr << "[Security Warning] CALCITE_KIMI_API_TOKEN not set. AI tag recommendation will fail." << std::endl;
+    }
+}
 
 KimiService::~KimiService() = default;
 
@@ -182,7 +191,14 @@ void KimiService::performLlmRequest(
     auto req = drogon::HttpRequest::newHttpRequest();
     req->setMethod(drogon::Post);
     req->setPath(API_PATH);
-    req->addHeader("Authorization", std::string("Bearer ") + API_TOKEN);
+    if (apiToken_.empty()) {
+        TagRecommendationResult tagResult;
+        tagResult.success = false;
+        tagResult.errorMessage = "KIMI API token not configured";
+        callback(tagResult);
+        return;
+    }
+    req->addHeader("Authorization", std::string("Bearer ") + apiToken_);
     req->setContentTypeCode(drogon::CT_APPLICATION_JSON);
     req->setBody(requestJson);
 

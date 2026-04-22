@@ -309,11 +309,12 @@ void NoteController::getNoteDetail(const HttpRequestPtr &req, std::function<void
 
         int64_t noteId = std::stoll(noteIdStr);
 
+        auto    dbClient = drogon::app().getDbClient("default");
         // 查询笔记详情
-        drogon::orm::Mapper<drogon_model::calcite::Note> noteMapper(drogon::app().getDbClient("default"));
+        drogon::orm::Mapper<drogon_model::calcite::Note> noteMapper(dbClient);
         noteMapper.findByPrimaryKey(
             noteId,
-            [callback, this, userId](const drogon_model::calcite::Note &note)
+            [callback, this, userId, dbClient](const drogon_model::calcite::Note &note)
             {
               if (note.getValueOfUserId() != userId && note.getIsPublic() == 0) {
                 auto resp = HttpResponse::newHttpJsonResponse(createResponse(1, "无权访问该笔记"));
@@ -322,6 +323,7 @@ void NoteController::getNoteDetail(const HttpRequestPtr &req, std::function<void
               }
 
               Json::Value data;
+
               data["id"]        = static_cast<Json::Int64>(note.getValueOfId());
               data["title"]     = note.getValueOfTitle();
               data["content"]   = note.getValueOfContent();
@@ -335,8 +337,41 @@ void NoteController::getNoteDetail(const HttpRequestPtr &req, std::function<void
               }
               data["is_public"] = note.getValueOfIsPublic();
 
-              auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "获取笔记详情成功", data));
-              callback(resp);
+              // 点赞和收藏状态 作者
+              data["author_id"]     = note.getValueOfUserId();
+              data["like_count"]    = note.getValueOfLikeCount();
+              data["collect_count"] = note.getValueOfCollectCount();
+
+              data["has_liked"]     = false; // 默认未点赞
+              data["has_collected"] = false; // 默认未收藏
+
+              // 查询user_action表判断是否已经点赞/收藏
+              drogon::orm::Mapper<drogon_model::calcite::UserAction> actionMapper(dbClient);
+              actionMapper.findBy(
+                  drogon::orm::Criteria(drogon_model::calcite::UserAction::Cols::_user_id, userId) &&
+                      drogon::orm::Criteria(drogon_model::calcite::UserAction::Cols::_note_id, note.getValueOfId()),
+
+                  [callback, this, userId, data](const std::vector<drogon_model::calcite::UserAction> &actions) mutable
+                  {
+                    // action_type: view 1, like 2, collect 3
+                    for (const auto &action : actions) {
+                      if (action.getValueOfActionType() == 2)
+                        data["has_liked"] = true;
+                      else if (action.getValueOfActionType() == 3)
+                        data["has_collected"] = true;
+                    }
+
+                    auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "获取笔记详情成功", data));
+                    callback(resp);
+                  },
+                  [callback, this, data](const drogon::orm::DrogonDbException &e)
+                  {
+                    // 查询行为失败不影响主返回
+                    LOG_ERROR << "查询用户行为异常: " << e.base().what();
+                    // 即使查询失败，也返回笔记详情
+                    auto resp = HttpResponse::newHttpJsonResponse(createResponse(0, "获取笔记详情成功", data));
+                    callback(resp);
+                  });
             },
             [callback, this](const drogon::orm::DrogonDbException &e)
             {
@@ -464,6 +499,7 @@ void NoteController::searchNotes(const HttpRequestPtr &req, std::function<void(c
                 noteJson["highlight_content"] = esResult.highlightContent;
               }
               noteJson["score"] = esResult.score;
+              noteJson["author_id"] =  esResult.authorId;
               
               data.append(noteJson);
             }

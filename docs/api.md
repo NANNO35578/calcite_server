@@ -326,24 +326,32 @@ Header: `Authorization: Bearer {token}`
 Header: `Authorization: Bearer {token}`
 
 **请求参数：**
+
 | 参数    | 类型   | 必填 | 说明     |
 | ------- | ------ | ------ | -------- |
 | note_id | string | 是     | 笔记ID   |
 
 **响应示例：**
+- 以下是`GET http://localhost:8888/api/note/detail?note_id=1`的响应
 ```json
 {
-  "code": 0,
-  "message": "获取笔记详情成功",
-  "data": {
-    "id": 1,
-    "title": "我的第一篇笔记",
-    "content": "笔记内容...",
-    "summary": "笔记摘要",
-    "folder_id": 1,
-    "created_at": "2025-01-01 12:00:00",
-    "updated_at": "2025-01-01 12:00:00"
-  }
+    "code": 0,
+    "data": {
+        "author_id": 1,
+        "collect_count": 0,
+        "content": "更新后的内容",
+        "created_at": "2026-01-25 14:25:18",
+        "folder_id": 1,
+        "has_collected": false,
+        "has_liked": false,
+        "id": 1,
+        "is_public": 0,
+        "like_count": 0,
+        "summary": "更新后的摘要",
+        "title": "更新后的标题",
+        "updated_at": "2026-01-25 14:28:46"
+    },
+    "message": "获取笔记详情成功"
 }
 ```
 
@@ -361,22 +369,35 @@ Header: `Authorization: Bearer {token}`
 | size     | int    | 否     | 每页数量，默认20，最大100   |
 
 **响应示例：**
+- 以下是`GET http://localhost:8888/api/note/search?keyword=C++&is_public=0`的部分响应
 ```json
 {
-  "code": 0,
-  "message": "搜索成功",
-  "data": [
-    {
-      "id": 1,
-      "title": "我的第一篇笔记",
-      "summary": "笔记摘要",
-      "created_at": "2025-01-01 12:00:00",
-      "updated_at": "2025-01-01 12:00:00",
-      "highlight_title": "我的第一篇<mark>笔记</mark>",
-      "highlight_content": "这是一篇关于<mark>笔记</mark>的测试内容...",
-      "score": 1.25
-    }
-  ]
+    "code": 0,
+    "data": [
+        {
+            "author_id": 7,
+            "created_at": "2026-04-19T13:42:35",
+            "highlight_content": "## 笔记2：<mark>C</mark>语言数据类型与变量\n### ... **变量定义与使用**\n```<mark>c</mark>\n// 格式",
+            "highlight_title": "<mark>C</mark>语言数据类型与变量",
+            "id": 125,
+            "score": 4.7718439102172852,
+            "summary": "",
+            "title": "C语言数据类型与变量",
+            "updated_at": "2026-04-19T14:32:35"
+        },
+        {
+            "author_id": 7,
+            "created_at": "2026-04-19T13:42:14",
+            "highlight_content": "## 笔记1：<mark>C</mark>语言基础入门与环境搭建\n# ... **<mark>C</mark>语言概述**：编译型高级语言，执行效率高 ... **第一个<mark>C</mark>程序（固定模板）**\n\n哦,",
+            "highlight_title": "<mark>C</mark>语言基础入门与环境搭建",
+            "id": 124,
+            "score": 4.7718439102172852,
+            "summary": "",
+            "title": "C语言基础入门与环境搭建",
+            "updated_at": "2026-04-20T17:49:06"
+        }
+    ],
+    "message": "搜索成功"
 }
 ```
 
@@ -390,7 +411,7 @@ Header: `Authorization: Bearer {token}`
 - `score`: 匹配相关度分数
 - 响应不包含完整 `content` 字段，需要详情请调用 `/api/note/detail`
 
-### 2.7 获取笔记标签列表 GET /api/notes/{id}/tags
+### 2.7 获取笔记标签列表 GET /api/notes/tags
 
 **请求方式：**
 Header: `Authorization: Bearer {token}`
@@ -418,7 +439,7 @@ Header: `Authorization: Bearer {token}`
 }
 ```
 
-### 2.8 AI 生成笔记标签 POST /api/notes/{id}/tags/ai
+### 2.8 AI 生成笔记标签 POST /api/notes/tags/ai
 
 **请求方式：**
 Header: `Authorization: Bearer {token}`

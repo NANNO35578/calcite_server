@@ -20,6 +20,7 @@ struct EsSearchResult {
     std::string highlightTitle;  // 高亮标题
     std::string highlightContent;// 高亮内容片段
     float score;                 // 匹配分数
+    int64_t authorId;            // 作者ID（从_source取）
 };
 
 /**

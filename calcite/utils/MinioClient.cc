@@ -14,6 +14,8 @@
 #include <sstream>
 #include <fstream>
 #include <cstring>
+#include <cstdlib>
+#include <iostream>
 #include <chrono>
 #include <iomanip>
 
@@ -40,7 +42,16 @@ static size_t readCallback(void* ptr, size_t size, size_t nmemb, void* userdata)
     return stream->gcount();
 }
 
-MinioClient::MinioClient() = default;
+MinioClient::MinioClient() {
+    const char* envAccessKey = std::getenv("CALCITE_MINIO_ACCESS_KEY");
+    const char* envSecretKey = std::getenv("CALCITE_MINIO_SECRET_KEY");
+    if (envAccessKey && std::strlen(envAccessKey) > 0) {
+        config_.accessKey = envAccessKey;
+    }
+    if (envSecretKey && std::strlen(envSecretKey) > 0) {
+        config_.secretKey = envSecretKey;
+    }
+}
 
 MinioClient::MinioClient(const MinioConfig& config) : config_(config) {}
 

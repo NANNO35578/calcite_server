@@ -221,7 +221,7 @@ void EsClient::search(int64_t userId,
     std::string body = R"({
         "from": )" + std::to_string(from) + R"(,
         "size": )" + std::to_string(size) + R"(,
-        "_source": ["title", "summary", "created_at", "updated_at", "tags"],
+        "_source": ["title", "summary", "created_at", "updated_at", "tags", "user_id"],
         "query": {
             "bool": {
                 "must": [
@@ -243,9 +243,9 @@ void EsClient::search(int64_t userId,
             "pre_tags": ["<mark>"],
             "post_tags": ["</mark>"],
             "fields": {
-                "title": {"fragment_size": 100, "number_of_fragments": 1},
-                "content": {"fragment_size": 200, "number_of_fragments": 3},
-                "summary": {"fragment_size": 200, "number_of_fragments": 1}
+                "title": {"fragment_size": 10, "number_of_fragments": 1},
+                "content": {"fragment_size": 20, "number_of_fragments": 3},
+                "summary": {"fragment_size": 10, "number_of_fragments": 1}
             }
         },
         "sort": [
@@ -416,6 +416,9 @@ void EsClient::parseResultCallback(const std::string &jsonResponse, std::functio
                         tagHitCounts[tag.asString()] += 1; // 统计标签命中次数
                     }
                 }
+            }
+            if(source.isMember("user_id")) {
+                result.authorId = source["user_id"].asInt64();
             }
         }
         // ====================================================================

@@ -49,9 +49,9 @@ private:
     static constexpr const char* API_PATH = "/v1/chat/completions";
     static constexpr const char* API_MODEL = "moonshot-v1-8k";
     static constexpr int API_TIMEOUT = 60; // seconds
-    static constexpr const char* API_TOKEN = "sk-1IR0GxD62ghG0u71BSBuSfo9HhMVidr6usSeo9yr0ez0LpIO";
 
     drogon::HttpClientPtr client_;
+    std::string apiToken_;
 
     /**
      * Build the tag-recommendation prompt.

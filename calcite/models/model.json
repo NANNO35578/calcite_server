@@ -4,7 +4,7 @@
     "port": 3306,
     "dbname": "calcite",
     "user": "root",
-    "password": "mysql0",
+    "password": "",
     "client_encoding": "utf8mb4",
     // "tables": ["user"],
     // "tables": ["note"],

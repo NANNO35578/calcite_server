@@ -14,7 +14,7 @@
             "port": 3306,
             "dbname": "calcite",
             "user": "root",
-            "passwd": "mysql0",
+            "passwd": "",
             "is_fast": false,
             "client_encoding": "utf8mb4",
             "number_of_connections": 4,
